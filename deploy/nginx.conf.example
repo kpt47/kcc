@@ -1,0 +1,22 @@
+# ตัวอย่างค่า nginx reverse proxy — คัดลอกไปไว้ที่ /etc/nginx/sites-available/kkc-webapp บนเซิร์ฟเวอร์
+# แล้วสร้าง symlink: sudo ln -s /etc/nginx/sites-available/kkc-webapp /etc/nginx/sites-enabled/
+# แก้ your-domain.example.com เป็นโดเมนจริง (หรือ IP เซิร์ฟเวอร์ถ้ายังไม่มีโดเมน) แล้วรัน:
+#   sudo certbot --nginx -d your-domain.example.com   (ขอใบรับรอง HTTPS ฟรีจาก Let's Encrypt)
+
+server {
+    listen 80;
+    server_name your-domain.example.com;
+
+    client_max_body_size 20M; # รองรับไฟล์แนบ (สลิปโอนเงิน/รูปสมุดบัญชี)
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

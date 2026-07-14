@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+/* โหมดมืด (ควบคุมด้วย class="dark" บน <html> ผ่าน next-themes — ดู tailwind.config.ts darkMode: "class") */
+.dark {
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+}
+
+/* ปรับขนาดตัวอักษรฐาน (root font-size) ให้ใหญ่ขึ้นกว่าค่ามาตรฐาน 16px เพื่อให้อ่านง่ายขึ้นสำหรับ
+   ผู้สูงอายุ (ชาวบ้าน/กรรมการหมู่บ้าน) — เนื่องจาก class ขนาดตัวอักษรของ Tailwind (text-sm, text-base ฯลฯ)
+   คำนวณจากหน่วย rem ที่อ้างอิง root font-size นี้เสมอ การปรับที่จุดเดียวนี้จึงขยายทุกจุดในแอปพร้อมกัน */
+html {
+  font-size: 18px;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Noto Sans Thai", "Prompt", ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+/* กันขนาดตัวอักษรใน input เล็กกว่า 16px บน iOS ซึ่งจะทำให้ Safari ซูมเข้าอัตโนมัติเมื่อโฟกัส */
+input,
+select,
+textarea,
+button {
+  font-size: 16px;
+}

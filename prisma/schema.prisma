@@ -1,0 +1,621 @@
+// Prisma schema — โครงการแก้ไขปัญหาความยากจน (กข.คจ.)
+// อ้างอิงโครงสร้างจากสมุดบัญชี 4 เล่ม:
+//   เล่มม่วง   = สมุดบัญชีทะเบียนครัวเรือนเป้าหมาย
+//   เล่มน้ำตาล = สมุดบันทึกสถานะหมู่บ้าน
+//   เล่มเขียว  = บัญชีคุมเงินฝากธนาคาร
+//   เล่มเหลือง = บัญชีคุมลูกหนี้
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// โครงสร้างเขตการปกครอง (Hierarchy): ภาค -> จังหวัด -> อำเภอ -> ตำบล -> หมู่บ้าน
+// ใช้เป็นฐานสำหรับการจำกัดขอบเขตข้อมูล (data scope) ตามบทบาทผู้ใช้งาน
+// และการรวบรวมสถิติ/รายงานข้ามหมู่บ้านในระบบรวมศูนย์ระดับประเทศ
+// ============================================================
+
+model Region {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique // เช่น ภาคเหนือ, ภาคกลาง, ภาคตะวันออกเฉียงเหนือ, ภาคใต้
+  provinces Province[]
+}
+
+model Province {
+  id       Int    @id @default(autoincrement())
+  name     String @unique
+  regionId Int
+  region   Region @relation(fields: [regionId], references: [id])
+
+  districts  District[]
+  scopeUsers User[]     @relation("UserProvinceScope")
+}
+
+model District {
+  id         Int      @id @default(autoincrement())
+  name       String
+  provinceId Int
+  province   Province @relation(fields: [provinceId], references: [id])
+
+  subDistricts SubDistrict[]
+
+  scopeUsers User[] @relation("UserDistrictScope")
+
+  @@unique([provinceId, name])
+}
+
+model SubDistrict {
+  id         Int      @id @default(autoincrement())
+  name       String
+  districtId Int
+  district   District @relation(fields: [districtId], references: [id])
+
+  villages Village[]
+
+  scopeUsers User[] @relation("UserSubDistrictScope")
+
+  @@unique([districtId, name])
+}
+
+// ============================================================
+// บัญชีผู้ใช้งานและสิทธิ์การเข้าถึง (RBAC)
+// อ้างอิงระเบียบกระทรวงมหาดไทยว่าด้วยการบริหารและการใช้จ่ายเงินโครงการ กข.คจ. พ.ศ. 2553
+// ครอบคลุมตั้งแต่ระดับครัวเรือนจนถึงระดับประเทศ (กรมการพัฒนาชุมชน)
+// ============================================================
+
+/// บทบาทผู้ใช้งานระดับ Global: จากล่างสุด (ครัวเรือน) ถึงบนสุด (ส่วนกลาง)
+/// ลำดับขั้นนี้ตรงกับ ROLE_RANK ใน src/lib/authz.ts ห้ามสลับลำดับโดยไม่แก้ที่นั่นด้วย
+enum GlobalRole {
+  HOUSEHOLD // ครัวเรือนเป้าหมาย
+  VILLAGE_COMMITTEE // คณะกรรมการ กข.คจ. หมู่บ้าน (ดูตำแหน่งย่อยที่ CommitteeRole)
+  SUB_DISTRICT_ADMIN // พัฒนากรผู้รับผิดชอบตำบล
+  DISTRICT_ADMIN // ผู้บริหารอำเภอ
+  PROVINCIAL_ADMIN // ผู้บริหารจังหวัด
+  GLOBAL_ADMIN // กรมการพัฒนาชุมชน (ส่วนกลาง)
+  IT_SUPPORT // ผู้ดูแลระบบด้านเทคนิค — ไม่ใช่ส่วนหนึ่งของสายบังคับบัญชาภูมิศาสตร์ ไม่มีสิทธิ์เข้าถึงข้อมูลสมุดทะเบียนโครงการ
+             // ทั้ง 4 เล่มเด็ดขาด จัดการได้เฉพาะบัญชีผู้ใช้งาน (ดูอย่างเดียว) และ SystemAuditLog เท่านั้น
+}
+
+/// ตำแหน่งย่อยของผู้ใช้ที่มี role = VILLAGE_COMMITTEE เท่านั้น
+enum CommitteeRole {
+  CHAIRMAN // ประธานคณะกรรมการ
+  SECRETARY // เลขานุการ
+  FINANCE_MEMBER // กรรมการเงินทุน
+  NORMAL_MEMBER // กรรมการทั่วไป
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  username      String         @unique
+  passwordHash  String
+  role          GlobalRole
+  committeeRole CommitteeRole? // ใช้เฉพาะเมื่อ role = VILLAGE_COMMITTEE
+  phoneNumber   String // บังคับกรอกทุก role — ใช้สำหรับส่ง SMS แจ้งเตือน และฟังก์ชัน Click-to-Call
+  email         String @unique // บังคับกรอกทุก role — ใช้สำหรับกู้คืนรหัสผ่านด้วย OTP ทางอีเมล
+  lineId        String? // LINE userId ของผู้ใช้ — ใช้สำหรับส่งข้อความแจ้งเตือนผ่าน LINE Messaging API (เดิมชื่อ "LINE แจ้งเตือน")
+  isActive      Boolean  @default(true) // false = ถูกระงับการใช้งาน (soft delete) — ห้าม login อีก
+
+  // ข้อมูลส่วนบุคคล (Profile Separation): User เก็บเฉพาะข้อมูลระบบ/การติดต่อ/พื้นที่เท่านั้น
+  // ชื่อ-สกุลและข้อมูลเฉพาะแต่ละบทบาทแยกไปเก็บที่ตาราง *Profile ด้านล่าง (1-to-1 ตาม role)
+  householdProfile HouseholdProfile?
+  committeeProfile CommitteeProfile?
+  officialProfile  OfficialProfile?
+
+  // ผูกบัญชี role HOUSEHOLD เข้ากับครัวเรือนเป้าหมายที่เป็นเจ้าของจริง — ใช้บังคับ data isolation
+  // ไม่ให้เห็น/แก้ไขข้อมูลของครัวเรือนอื่นในหมู่บ้านเดียวกัน (แยกจาก scopeVillageId ซึ่งกว้างระดับหมู่บ้าน)
+  householdId Int?
+  household   TargetHousehold? @relation(fields: [householdId], references: [id])
+
+  // ขอบเขตข้อมูลที่มองเห็นได้ ขึ้นอยู่กับ role: HOUSEHOLD/VILLAGE_COMMITTEE ผูกกับ scopeVillageId,
+  // SUB_DISTRICT_ADMIN ผูกกับ scopeSubDistrictId, DISTRICT_ADMIN ผูกกับ scopeDistrictId,
+  // PROVINCIAL_ADMIN ผูกกับ scopeProvinceId, GLOBAL_ADMIN ไม่มีขอบเขต (เห็นทั้งหมด)
+  scopeVillageId     Int?
+  scopeVillage       Village?     @relation(fields: [scopeVillageId], references: [id])
+  scopeSubDistrictId Int?
+  scopeSubDistrict   SubDistrict? @relation("UserSubDistrictScope", fields: [scopeSubDistrictId], references: [id])
+  scopeDistrictId    Int?
+  scopeDistrict      District?    @relation("UserDistrictScope", fields: [scopeDistrictId], references: [id])
+  scopeProvinceId    Int?
+  scopeProvince      Province?    @relation("UserProvinceScope", fields: [scopeProvinceId], references: [id])
+
+  createdAt DateTime @default(now())
+  sessions  Session[]
+
+  approvedLoans              Loan[]            @relation("LoanApprovedBy")
+  chairmanApprovedTransactions BankTransaction[] @relation("BankTxnChairmanApproval")
+  financeApprovedTransactions  BankTransaction[] @relation("BankTxnFinanceApproval")
+  notifications               Notification[]
+  uploadedMeetingRecords       VillageMeetingRecord[]
+  passwordResetOtps            PasswordResetOtp[]
+  auditLogs                    SystemAuditLog[]
+}
+
+/// ข้อมูลส่วนบุคคลของผู้ใช้ role HOUSEHOLD (1-to-1 กับ User, สร้างเมื่อมีการเปิดบัญชีให้ครัวเรือน)
+/// เก็บเฉพาะข้อมูลที่ยังไม่มีที่เก็บอื่น — ชื่อ/บ้านเลขที่/จำนวนสมาชิก/รายได้/ลำดับที่ ยังคงอยู่ที่
+/// TargetHousehold + HouseholdIncomeRecord (ผ่าน User.household) เพื่อไม่ให้เกิดข้อมูลซ้ำซ้อนกันสองแหล่ง
+/// เนื่องจาก TargetHousehold ลงทะเบียนแยกได้ก่อนที่จะมีบัญชีผู้ใช้งานผูกอยู่เสมอ (ดู /households/new)
+model HouseholdProfile {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  age               Int? // อายุ ณ วันที่เปิดบัญชี
+  occupation        String? // อาชีพปัจจุบัน
+  consentPersonName String? // ชื่อผู้ให้ความยินยอม (อ้างอิงสัญญายืมเงิน)
+  consentRelation   String? // ความสัมพันธ์กับผู้ให้ความยินยอม เช่น ภรรยา/สามี/ทายาท
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+/// ข้อมูลส่วนบุคคลของผู้ใช้ role VILLAGE_COMMITTEE (1-to-1 กับ User)
+/// ไม่เก็บ committeeRole ซ้ำที่นี่ — ใช้ User.committeeRole เป็นแหล่งข้อมูลเดียวเพื่อไม่ให้ข้อมูลเพี้ยนกัน
+model CommitteeProfile {
+  id            Int       @id @default(autoincrement())
+  userId        Int       @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName     String
+  lastName      String
+  termStartDate DateTime? // วันที่เริ่มวาระ
+  termEndDate   DateTime? // วันที่สิ้นสุดวาระ
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+/// ข้อมูลส่วนบุคคลของเจ้าหน้าที่รัฐ (SUB_DISTRICT_ADMIN ขึ้นไป) (1-to-1 กับ User)
+model OfficialProfile {
+  id            Int       @id @default(autoincrement())
+  userId        Int       @unique
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName     String
+  lastName      String
+  positionTitle String? // ตำแหน่งทางการ
+  handoverDate  DateTime? // วันที่รับมอบงาน (อ้างอิงสมุดเล่มน้ำตาล)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+/// ประเภทการแจ้งเตือนในระบบ (In-app Notification)
+enum NotificationType {
+  ALERT // แจ้งเตือนเร่งด่วน เช่น รายชื่อครัวเรือนที่เลยกำหนดชำระหนี้
+  REMINDER // แจ้งเตือนล่วงหน้า เช่น สรุปยอดที่ต้องชำระประจำเดือน
+}
+
+/// การแจ้งเตือนภายในระบบ (In-app Notification) แสดงผลผ่าน "กระดิ่งแจ้งเตือน" ที่ Top Navigation Bar
+model Notification {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  link      String? // เส้นทาง (relative URL) สำหรับ deep-link ไปยังหน้า/รายการที่เกี่ยวข้องเมื่อคลิก
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// ============================================================
+// Master Data
+// ============================================================
+
+/// ข้อมูลหมู่บ้านที่เข้าร่วมโครงการ กข.คจ. (เล่มน้ำตาล ส่วนที่ 1: ทะเบียนหมู่บ้านระดับอำเภอ)
+model Village {
+  id            Int      @id @default(autoincrement())
+  registryNo    Int? // ลำดับเลขที่ประจำหมู่บ้าน (เรียงตามปีงบประมาณ)
+  villageNo     String // หมู่ที่
+  villageName   String // ชื่อหมู่บ้าน
+  subDistrictId Int
+  subDistrict   SubDistrict @relation(fields: [subDistrictId], references: [id])
+  budgetYear    Int // ปี พ.ศ. ที่ได้รับงบประมาณ (ครั้งแรก)
+  budgetAmount  Float? // จำนวนเงินงบประมาณที่ได้รับ (บาท)
+  latitude      Float? // พิกัดละติจูด — ใช้แสดงหมุดในแท็บ "มุมมองแผนที่" (Smart Report & Map Center)
+  longitude     Float? // พิกัดลองจิจูด
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  households        TargetHousehold[]
+  committeeMembers  CommitteeMember[]
+  workerAssignments DevelopmentWorkerAssignment[]
+  visitLogs         VisitLog[]
+  bankAccounts      BankAccount[]
+  handovers         VillageHandover[]
+  statusSnapshots   VillageStatusSnapshot[]
+  scopeUsers        User[]
+  assignments       VillageAssignment[]
+  meetingRecords    VillageMeetingRecord[]
+
+  @@unique([villageNo, subDistrictId])
+}
+
+/// ครัวเรือนเป้าหมาย (เล่มม่วง หน้า 1: บัญชีทะเบียนครัวเรือนเป้าหมาย)
+model TargetHousehold {
+  id                Int      @id @default(autoincrement())
+  villageId         Int
+  village           Village  @relation(fields: [villageId], references: [id])
+  sequenceNo        Int // ลำดับที่ครัวเรือนเป้าหมาย (เรียงรายได้น้อยไปมาก)
+  headFirstName     String // ชื่อหัวหน้าครัวเรือน
+  headLastName      String // นามสกุลหัวหน้าครัวเรือน
+  houseNo           String? // บ้านเลขที่
+  memberCount       Int? // จำนวนสมาชิกในครัวเรือน
+  incomeBeforeLoan  Float? // รายได้เฉลี่ยต่อคนต่อปีตามเกณฑ์ จปฐ. ก่อนยืมเงิน (บาท)
+  isDefaulted       Boolean  @default(false) // ครัวเรือนผิดสัญญา (เล่มน้ำตาล ส่วนที่ 3)
+  defaultedAmount   Float? // จำนวนเงินที่ผิดสัญญา (บาท)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  incomeRecords HouseholdIncomeRecord[]
+  loans         Loan[]
+  proposals     ProjectProposal[]
+  loanRequests  LoanRequest[]
+  users         User[] // บัญชีผู้ใช้ role HOUSEHOLD ที่ผูกกับครัวเรือนนี้ (สำหรับ data isolation)
+
+  @@unique([villageId, sequenceNo])
+}
+
+/// รายได้เฉลี่ยภายหลังรับเงินยืม ภายหลัง 1/2/3 ปี (เล่มม่วง หน้า 1)
+model HouseholdIncomeRecord {
+  id             Int             @id @default(autoincrement())
+  householdId    Int
+  household      TargetHousehold @relation(fields: [householdId], references: [id])
+  yearsAfterLoan Int // ภายหลังรับเงินยืม 1 / 2 / 3 ปี
+  income         Float // รายได้เฉลี่ยต่อคนต่อปี (บาท)
+
+  @@unique([householdId, yearsAfterLoan])
+}
+
+/// คณะกรรมการ กข.คจ. หมู่บ้าน ผู้รับผิดชอบเงินทุน (เล่มม่วง ท้ายเล่ม)
+model CommitteeMember {
+  id        Int       @id @default(autoincrement())
+  villageId Int
+  village   Village   @relation(fields: [villageId], references: [id])
+  setNo     Int? // ชุดที่
+  name      String // ชื่อ-สกุล
+  position  String? // ตำแหน่ง
+  startDate DateTime? // วันเดือนปี เริ่มรับผิดชอบ
+  endDate   DateTime? // วันเดือนปี สิ้นสุดรับผิดชอบ
+}
+
+/// พัฒนากรผู้รับผิดชอบหมู่บ้าน กข.คจ. (เล่มม่วง ท้ายเล่ม)
+model DevelopmentWorkerAssignment {
+  id        Int       @id @default(autoincrement())
+  villageId Int
+  village   Village   @relation(fields: [villageId], references: [id])
+  name      String // ชื่อ-สกุล
+  position  String? // ตำแหน่ง
+  startDate DateTime? // วันเดือนปี เริ่มรับผิดชอบ
+  endDate   DateTime? // วันเดือนปี สิ้นสุดรับผิดชอบ
+}
+
+/// บันทึกการติดตาม ตรวจสอบ และให้ข้อแนะนำของเจ้าหน้าที่ (เล่มม่วง ท้ายเล่ม)
+model VisitLog {
+  id           Int      @id @default(autoincrement())
+  villageId    Int
+  village      Village  @relation(fields: [villageId], references: [id])
+  visitDate    DateTime // วันเดือนปีที่ติดตาม
+  visitorName  String // ชื่อ/สกุลผู้ติดตาม
+  visitorTitle String? // ตำแหน่งผู้ติดตาม
+  notes        String? // ประเด็นที่ติดตามและข้อสังเกตแนะนำ
+}
+
+// ============================================================
+// พัฒนากรและการส่งมอบ-รับมอบงาน (เวอร์ชันปรับโครงสร้างใหม่ให้เป็น relation จริง
+// แทนการเก็บชื่อเป็น string ตรงๆ อย่าง DevelopmentWorkerAssignment/VillageHandover ด้านบน)
+// อ้างอิง เล่มม่วง: รายชื่อพัฒนากร ผู้รับผิดชอบ หมู่บ้าน กข.คจ. / เล่มน้ำตาล ส่วนที่ 2: บันทึกการส่งมอบและรับมอบ
+// ============================================================
+
+/// ข้อมูลพัฒนากร (เล่มม่วง ท้ายเล่ม: รายชื่อพัฒนากร ผู้รับผิดชอบ หมู่บ้าน กข.คจ.)
+model Developer {
+  id        Int      @id @default(autoincrement())
+  firstName String
+  lastName  String
+  position  String? // ตำแหน่ง
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments       VillageAssignment[]
+  sentHandovers     HandoverLog[]       @relation("HandoverSender")
+  receivedHandovers HandoverLog[]       @relation("HandoverReceiver")
+}
+
+/// ประวัติการรับผิดชอบหมู่บ้านของพัฒนากรแต่ละคน (เล่มม่วง ท้ายเล่ม)
+model VillageAssignment {
+  id          Int       @id @default(autoincrement())
+  developerId Int
+  developer   Developer @relation(fields: [developerId], references: [id])
+  villageId   Int
+  village     Village   @relation(fields: [villageId], references: [id])
+  startDate   DateTime // วันเดือนปี เริ่มรับผิดชอบ
+  endDate     DateTime? // วันเดือนปี สิ้นสุดรับผิดชอบ
+  status      String    @default("ACTIVE") // "ACTIVE" | "TRANSFERRED"
+}
+
+/// บันทึกการส่งมอบ-รับมอบงานระหว่างพัฒนากร (เล่มน้ำตาล ส่วนที่ 2: บันทึกการส่งมอบและรับมอบ)
+model HandoverLog {
+  id           Int       @id @default(autoincrement())
+  handoverDate DateTime
+  senderId     Int
+  sender       Developer @relation("HandoverSender", fields: [senderId], references: [id])
+  receiverId   Int
+  receiver     Developer @relation("HandoverReceiver", fields: [receiverId], references: [id])
+  villageCount Int // จำนวนหมู่บ้านที่ส่งมอบ
+  notes        String?
+}
+
+// ============================================================
+// Transactions
+// ============================================================
+
+/// สถานะการอนุมัติ ใช้ร่วมกันสำหรับ Loan (อนุมัติโดย CHAIRMAN) และ BankTransaction (multi-signature)
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// สถานะเครดิต/ความเสี่ยงของเงินยืมแต่ละก้อน คำนวณอัตโนมัติจาก dueDate ทุกวัน (ดู src/lib/risk.ts)
+/// และรีเซ็ตกลับเป็น NORMAL อัตโนมัติเมื่อมีการอนุมัติรับชำระเงิน หรือรีเซ็ตด้วยตนเองผ่าน /api/households/[id]/reset-credit
+enum RiskStatus {
+  NORMAL // ปกติ — ยังไม่ถึงกำหนดชำระ (เกิน 15 วันก่อนครบกำหนด) หรือชำระตรงตามงวด
+  WATCHLIST // เฝ้าระวัง — ใกล้ถึงกำหนดชำระใน 15 วัน หรือเลยกำหนดมาไม่เกิน 30 วัน
+  HIGH_RISK // เสี่ยงสูง/ผิดสัญญา — เลยกำหนดชำระเกิน 30 วัน
+}
+
+/// การยืมเงินทุนของครัวเรือนเป้าหมายแต่ละครั้ง (เล่มม่วง: ข้อมูลการยืมเงินทุน / เล่มเหลือง: บัญชีคุมลูกหนี้)
+/// สิทธิ์: SECRETARY สร้าง/แก้ไขได้ (canCreateOrUpdateLoan), CHAIRMAN อนุมัติได้ (canApproveLoan) — ดู src/lib/authz.ts
+model Loan {
+  id                 Int      @id @default(autoincrement())
+  householdId        Int
+  household          TargetHousehold @relation(fields: [householdId], references: [id])
+  borrowRound        Int // ยืมครั้งที่ (1, 2, 3, ...)
+  contractNo         String? // เลขที่สัญญายืมเงิน
+  amount             Float // จำนวนเงินยืม (บาท)
+  receivedDate       DateTime // วัน/เดือน/ปี ที่รับเงินยืม
+  dueDate            DateTime? // วัน/เดือน/ปี คืนเงินครั้งสุดท้ายตามสัญญา
+  occupation         String? // อาชีพที่ยืมเงินไปลงทุน
+  outstandingBalance Float // ยอดค้างชำระคงเหลือ (บาท)
+  isClosed           Boolean  @default(false) // ปิดสัญญาแล้ว (คืนครบแล้ว)
+
+  approvalStatus ApprovalStatus @default(PENDING) // อนุมัติโดยประธานคณะกรรมการ (CHAIRMAN)
+  approvedById   Int?
+  approvedBy     User?          @relation("LoanApprovedBy", fields: [approvedById], references: [id])
+  approvedAt     DateTime?
+
+  riskStatus RiskStatus @default(NORMAL) // ประเมินความเสี่ยง/จัดลำดับเครดิต — คำนวณอัตโนมัติจาก dueDate (ดู src/lib/risk.ts)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  repayments LoanRepayment[]
+
+  @@unique([householdId, borrowRound])
+}
+
+/// การรับคืนเงินยืมแต่ละงวด (เล่มเหลือง: บัญชีคุมลูกหนี้ - รายการรับคืนเงิน)
+model LoanRepayment {
+  id            Int      @id @default(autoincrement())
+  loanId        Int
+  loan          Loan     @relation(fields: [loanId], references: [id])
+  receiptNo     String? // เลขที่ใบสำคัญรับเงิน
+  paymentDate   DateTime // วัน/เดือน/ปี ที่คืนเงิน
+  amount        Float // จำนวนเงินที่คืน (บาท)
+  note          String?
+  transferSlipUrl String? // URL รูปภาพสลิปโอนเงิน (หลักฐานการรับชำระ)
+
+  // เวิร์กโฟลว์ "แจ้งชำระเงิน" ของครัวเรือน: รายการที่เลขาฯ/ฝ่ายการเงินคีย์ตรงถือว่า APPROVED ทันที (ค่าเริ่มต้น)
+  // ส่วนรายการที่ครัวเรือนแจ้งเองผ่าน /api/household/payments จะเริ่มที่ PENDING เสมอ จนกว่าจะถูกตรวจสอบ
+  // (recomputeLoanBalance นับรวมเฉพาะ APPROVED เท่านั้น — ดู src/lib/ledger.ts)
+  status          ApprovalStatus @default(APPROVED)
+  householdNote   String? // หมายเหตุ/ข้อความถึงกรรมการ ที่ครัวเรือนพิมพ์ตอนแจ้งชำระเงิน
+  committeeReply  String? // ข้อความตอบกลับจากกรรมการ (เช่น เหตุผลที่ปฏิเสธ)
+
+  createdAt     DateTime @default(now())
+}
+
+/// บัญชีเงินฝากธนาคารของหมู่บ้าน (เล่มเขียว: บัญชีคุมเงินฝากธนาคาร)
+model BankAccount {
+  id          Int    @id @default(autoincrement())
+  villageId   Int
+  village     Village @relation(fields: [villageId], references: [id])
+  bankName    String? // ชื่อธนาคาร
+  branch      String? // สาขา
+  accountNo   String? // เลขที่บัญชี
+  accountName String? // ชื่อบัญชี
+
+  transactions BankTransaction[]
+}
+
+/// รายการฝาก/ถอนเงินในบัญชีเงินฝากธนาคาร (เล่มเขียว)
+/// รายการถอนต้องผ่าน Multi-signature: CHAIRMAN ลงนาม 1 เสียง + FINANCE_MEMBER อย่างน้อย 1 เสียง
+/// ก่อนถือว่าอนุมัติ (isFullyApproved = ทั้งสองฟิลด์ไม่เป็น null) — ดู src/lib/authz.ts
+model BankTransaction {
+  id              Int         @id @default(autoincrement())
+  bankAccountId   Int
+  bankAccount     BankAccount @relation(fields: [bankAccountId], references: [id])
+  transactionDate DateTime // วัน เดือน ปี
+  documentNo      String? // เลขที่เอกสาร (ใบสำคัญรับเงิน/เลขที่บัญชีผู้ยืม)
+  description     String // รายการ
+  depositAmount   Float       @default(0) // ฝาก (บาท)
+  withdrawAmount  Float       @default(0) // ถอน (บาท)
+  balance         Float // คงเหลือ (บาท)
+  note            String? // หมายเหตุ
+  passbookImageUrl String? // URL รูปภาพสมุดบัญชีธนาคาร (หลักฐานประกอบรายการ)
+
+  chairmanApprovedById Int?
+  chairmanApprovedBy   User?     @relation("BankTxnChairmanApproval", fields: [chairmanApprovedById], references: [id])
+  chairmanApprovedAt   DateTime?
+  financeApprovedById  Int?
+  financeApprovedBy    User?     @relation("BankTxnFinanceApproval", fields: [financeApprovedById], references: [id])
+  financeApprovedAt    DateTime?
+
+  createdAt       DateTime    @default(now())
+}
+
+/// บันทึกการส่งมอบ-รับมอบเงินทุนหมู่บ้าน กข.คจ. เมื่อมีการโยกย้ายเจ้าหน้าที่ (เล่มน้ำตาล ส่วนที่ 2)
+model VillageHandover {
+  id           Int      @id @default(autoincrement())
+  villageId    Int
+  village      Village  @relation(fields: [villageId], references: [id])
+  handoverNo   Int // ครั้งที่
+  fromName     String // ชื่อผู้ส่งมอบ
+  fromPosition String? // ตำแหน่งผู้ส่งมอบ
+  toName       String // ชื่อผู้รับมอบ
+  toPosition   String? // ตำแหน่งผู้รับมอบ
+  handoverDate DateTime // วัน เดือน ปี ที่ส่งมอบ-รับมอบ
+
+  statusSnapshots VillageStatusSnapshot[]
+}
+
+/// ข้อมูลและสถานะของหมู่บ้าน ณ เวลาส่งมอบ-รับมอบแต่ละครั้ง (เล่มน้ำตาล ส่วนที่ 3)
+model VillageStatusSnapshot {
+  id                     Int              @id @default(autoincrement())
+  villageId              Int
+  village                Village          @relation(fields: [villageId], references: [id])
+  handoverId             Int?
+  handover               VillageHandover? @relation(fields: [handoverId], references: [id])
+  totalHouseholds        Int // ครัวเรือนเป้าหมายทั้งหมด
+  householdsReceivedLoan Int // ครัวเรือนที่ได้รับเงินยืมแล้ว
+  householdsRepaying     Int // ครัวเรือนที่อยู่ในระหว่างคืนเงินยืม
+  fundWithHouseholds     Float // เงินทุนอยู่ที่ครัวเรือนเป้าหมาย (บาท)
+  fundInBankAccount      Float // เงินทุนอยู่ในบัญชีเงินฝาก กข.คจ. (บาท)
+  fundElsewhere          Float // เงินทุนอยู่ที่อื่นๆ (บาท)
+  purpleBookExists       Boolean // มีสมุดบัญชีทะเบียนครัวเรือนเป้าหมาย (เล่มม่วง)
+  purpleBookCorrect      Boolean?
+  greenBookExists        Boolean // มีสมุดบัญชีคุมเงินฝากธนาคาร (เล่มเขียว)
+  greenBookCorrect       Boolean?
+  yellowBookExists       Boolean // มีสมุดบัญชีคุมลูกหนี้ (เล่มเหลือง)
+  yellowBookCorrect      Boolean?
+  hasDefaultedHouseholds Boolean // มีครัวเรือนเป้าหมายผิดสัญญา
+  defaultedAmount        Float?
+  note                   String?
+  recordedAt             DateTime         @default(now())
+}
+
+// ============================================================
+// เอกสารแบบฟอร์ม (แบบเสนอโครงการ / แบบขอยืมเงินทุน)
+// ============================================================
+
+/// แบบเสนอโครงการของครัวเรือนเป้าหมาย (แบบแนบท้ายระเบียบฯ พ.ศ. 2553 หมวด 4 ข้อ 16)
+model ProjectProposal {
+  id             Int             @id @default(autoincrement())
+  householdId    Int
+  household      TargetHousehold @relation(fields: [householdId], references: [id])
+  volumeNo       String? // เล่มที่
+  proposalNo     String? // โครงการที่
+  applicantAge   Int // อายุผู้เสนอโครงการ ณ วันที่ยื่น (ปี)
+  occupation     String // อาชีพ
+  projectName    String // ชื่อโครงการที่เสนอ
+  totalAmount    Float // เป็นเงินทั้งสิ้น (บาท)
+  proposedDate   DateTime // วันที่ผู้เสนอโครงการลงนาม
+
+  // ความเห็นของพัฒนากรผู้รับผิดชอบประจำตำบล
+  workerOpinion  String? // "possible" | "not_possible"
+  workerReason   String?
+  workerName     String?
+  workerDate     DateTime?
+
+  // ผลการพิจารณาอนุมัติของคณะกรรมการ กข.คจ. หมู่บ้าน
+  committeeDecision  String? // "approved" | "rejected"
+  committeeAmount    Float?
+  committeeReason    String?
+  committeeChairName String?
+  committeeDate      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items ProjectProposalItem[]
+}
+
+/// รายการย่อยของแบบเสนอโครงการ (ข้อ 2.1, 2.2, 2.3, ...)
+model ProjectProposalItem {
+  id          Int             @id @default(autoincrement())
+  proposalId  Int
+  proposal    ProjectProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  itemNo      Int // ลำดับรายการ (2.1, 2.2, ...)
+  description String // รายการ
+  amount      Float // เป็นเงิน (บาท)
+}
+
+/// แบบขอยืมเงินทุนของครัวเรือนเป้าหมาย (แบบแนบท้ายระเบียบฯ พ.ศ. 2553 หมวด 4 ข้อ 16)
+model LoanRequest {
+  id                Int             @id @default(autoincrement())
+  householdId       Int
+  household         TargetHousehold @relation(fields: [householdId], references: [id])
+  volumeNo          String? // เล่มที่
+  requestNo         String? // เลขที่
+  applicantAge      Int // อายุข้าพเจ้า ณ วันที่ยื่น (ปี)
+  occupation        String // อาชีพ
+  requestedAmount   Float // ขอยืมเงินทุนเป็นเงินทั้งสิ้น (บาท)
+  agreesToRegulations Boolean @default(false) // ยินยอมปฏิบัติตามระเบียบกระทรวงมหาดไทยฯ
+  spouseConsentName String? // ชื่อภรรยา/สามี/ทายาท ผู้ให้คำยินยอม
+  requestDate       DateTime // วันที่ลงนามขอยืม
+
+  // ความเห็นของพัฒนากรผู้รับผิดชอบประจำตำบล
+  workerOpinion String? // "agree" | "disagree"
+  workerReason  String?
+  workerName    String?
+  workerDate    DateTime?
+
+  // ผลการพิจารณาอนุมัติเงินยืมของคณะกรรมการ กข.คจ. หมู่บ้าน
+  committeeDecision  String? // "approved" | "rejected"
+  committeeAmount    Float?
+  committeeReason    String?
+  committeeChairName String?
+  committeeDate      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// วาระการประชุมและมติคณะกรรมการ กข.คจ. หมู่บ้าน (Meeting Records) — เก็บไฟล์แนบ (.pdf/.jpg/.png) เพื่อความโปร่งใส
+/// สร้าง/อัปโหลดได้เฉพาะประธาน/เลขานุการ/ฝ่ายการเงินของหมู่บ้านตนเอง — ดูได้ทุกคนตามเขตพื้นที่ (Area-Based Isolation)
+/// ลบได้เฉพาะพัฒนากรประจำตำบล (SUB_DISTRICT_ADMIN) เท่านั้น — ดู lib/authz.ts (canCreateMeetingRecord/canDeleteMeetingRecord)
+model VillageMeetingRecord {
+  id           Int      @id @default(autoincrement())
+  villageId    Int
+  village      Village  @relation(fields: [villageId], references: [id])
+  meetingDate  DateTime // วันที่ประชุม
+  agendaTopic  String // หัวข้อวาระการประชุม
+  fileUrl      String // URL ไฟล์แนบ (.pdf/.jpg/.png) — อัปโหลดผ่าน /api/uploads ก่อนแล้วส่ง URL มาที่นี่
+  uploadedById Int
+  uploadedBy   User     @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/// รหัส OTP ชั่วคราวสำหรับกู้คืนรหัสผ่านทางอีเมล (Self-Service Password Reset) — หมดอายุใน 5 นาทีตามที่กำหนด
+/// เก็บเฉพาะค่า hash ของ OTP (ไม่เก็บรหัส 6 หลักตัวจริง) เช่นเดียวกับการเก็บรหัสผ่าน — ดู lib/otp.ts
+model PasswordResetOtp {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  otpHash    String
+  expiresAt  DateTime
+  consumedAt DateTime? // null = ยังไม่ถูกใช้ — ใช้แล้วต้องไม่ใช้ซ้ำได้อีก
+  createdAt  DateTime  @default(now())
+}
+
+/// ประวัติเหตุการณ์ด้านความปลอดภัย (Login/OTP/CAPTCHA/LINE) — ใช้ตรวจสอบความผิดปกติย้อนหลัง
+/// userId/username เป็น null ได้ (เช่น พยายาม login ด้วย username ที่ไม่มีอยู่จริงในระบบ)
+model SystemAuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  username  String? // ชื่อผู้ใช้ที่พยายาม (เก็บไว้แม้ไม่พบบัญชีจริง เพื่อตรวจสอบการโจมตี)
+  action    String // เช่น "LOGIN_SUCCESS", "LOGIN_FAILED_CREDENTIALS", "LOGIN_FAILED_CAPTCHA", "FORGOT_PASSWORD_REQUESTED", "PASSWORD_RESET_SUCCESS", "PASSWORD_RESET_FAILED", "LINE_LINKED"
+  detail    String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
