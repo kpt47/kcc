@@ -4,6 +4,7 @@ import { proposalSchema } from "@/lib/schemas";
 import { getCurrentUser } from "@/lib/auth";
 import { getAllowedVillageIds, canAccessHouseholdRecord } from "@/lib/scope";
 import { ACCESS_DENIED_MESSAGE } from "@/lib/authz";
+import { notifyVillageLeadership } from "@/lib/notifications/notifyUsers";
 
 // แบบฟอร์ม 1 (แบบเสนอโครงการ): เฉพาะครัวเรือน (HOUSEHOLD) เป็นผู้สร้างของตนเองเท่านั้น — เจ้าหน้าที่/กรรมการ
 // ห้ามยื่นแทนครัวเรือน (ป้องกันการปลอมแปลงข้อมูลการยื่นคำร้อง)
@@ -57,6 +58,13 @@ export async function POST(request: Request) {
     },
     include: { items: true },
   });
+
+  // แจ้งเตือนพัฒนากรผู้รับผิดชอบตำบลและประธานกรรมการหมู่บ้าน ให้เห็นโครงการใหม่ที่รอพิจารณาทันที
+  await notifyVillageLeadership(
+    household.villageId,
+    `แจ้งเตือน: ครัวเรือน ${household.headFirstName} ${household.headLastName} เสนอโครงการ (ฟอร์ม 1) ใหม่ "${data.projectName}" งบประมาณ ${data.totalAmount.toLocaleString("th-TH")} บาท โปรดพิจารณา`,
+    "/proposals"
+  );
 
   return NextResponse.json(proposal, { status: 201 });
 }

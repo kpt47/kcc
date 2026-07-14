@@ -28,3 +28,30 @@ export async function notifyUsers(
     await notifyHousehold(recipient, message);
   }
 }
+
+/**
+ * แจ้งเตือนผู้นำหมู่บ้าน — พัฒนากรผู้รับผิดชอบตำบล (SUB_DISTRICT_ADMIN) และประธานกรรมการหมู่บ้าน
+ * (VILLAGE_COMMITTEE ที่ committeeRole = CHAIRMAN) ของหมู่บ้านที่ระบุ ใช้เมื่อครัวเรือนยื่นแบบเสนอโครงการ
+ * หรือแบบขอยืมเงินทุนใหม่ เพื่อให้ทั้งสองฝ่ายเห็นรายการที่รอพิจารณาทันทีผ่านกระดิ่งแจ้งเตือน
+ */
+export async function notifyVillageLeadership(villageId: number, message: string, link?: string): Promise<void> {
+  const village = await prisma.village.findUnique({ where: { id: villageId }, select: { subDistrictId: true } });
+  if (!village) return;
+
+  const recipients = await prisma.user.findMany({
+    where: {
+      OR: [
+        { role: "VILLAGE_COMMITTEE", committeeRole: "CHAIRMAN", scopeVillageId: villageId },
+        { role: "SUB_DISTRICT_ADMIN", scopeSubDistrictId: village.subDistrictId },
+      ],
+    },
+    select: { id: true },
+  });
+
+  await notifyUsers(
+    recipients.map((r) => r.id),
+    message,
+    "ALERT",
+    link
+  );
+}

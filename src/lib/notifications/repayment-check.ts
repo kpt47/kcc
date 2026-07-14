@@ -2,9 +2,11 @@
 // อ้างอิงตาราง Loan (บัญชีคุมลูกหนี้ เล่มเหลือง) เพื่อหาค่างวดที่ใกล้ครบกำหนดและเลยกำหนดชำระ
 import { prisma } from "@/lib/prisma";
 import { notifyHousehold } from "./channels";
+import { notifyUsers } from "./notifyUsers";
 import { recalculateLoanRiskStatuses } from "@/lib/risk";
 
-const REMINDER_WINDOW_DAYS = 7;
+const ONE_MONTH_REMINDER_DAYS = 30;
+const ONE_WEEK_REMINDER_DAYS = 7;
 
 function startOfDay(date: Date): Date {
   const d = new Date(date);
@@ -16,6 +18,10 @@ function addDays(date: Date, days: number): Date {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
   return d;
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 function startOfMonth(date: Date): Date {
@@ -38,7 +44,8 @@ export type RepaymentCheckSummary = {
 
 /**
  * งานตรวจสอบการชำระเงินยืมประจำวัน — ทำ 5 อย่าง:
- * 1. ครัวเรือน: ส่ง SMS/LINE (mock) แจ้งยอดและวันครบกำหนด สำหรับเงินยืมที่ครบกำหนดในอีก 7 วัน
+ * 1. ครัวเรือน: แจ้งเตือนผ่านกระดิ่ง (Notification) + SMS/LINE (mock) ล่วงหน้า 2 ช่วงก่อนครบกำหนดชำระ
+ *    คือ ก่อน 1 เดือน และก่อน 1 สัปดาห์ (แจ้งเฉพาะวันที่ตรงกับกำหนดพอดี ไม่แจ้งซ้ำทุกวัน)
  * 2. กรรมการหมู่บ้าน (SECRETARY, FINANCE_MEMBER): ถ้าวันนี้เป็นวันที่ 1 ของเดือน สรุปยอดที่ต้องชำระเดือนนี้ต่อหมู่บ้าน
  * 3. พัฒนากร (SUB_DISTRICT_ADMIN): แจ้งรายชื่อครัวเรือนที่เลยกำหนดชำระ แยกตามตำบล
  * 4. ครัวเรือนที่ค้างชำระเอง: ส่ง LINE แจ้งเตือนให้มาชำระคืนเงินยืมโดยตรง (แยกจากข้อ 3 ที่แจ้งเฉพาะพัฒนากร)
@@ -46,10 +53,9 @@ export type RepaymentCheckSummary = {
  */
 export async function runDailyRepaymentCheck(now: Date = new Date()): Promise<RepaymentCheckSummary> {
   const today = startOfDay(now);
-  const reminderDeadline = addDays(today, REMINDER_WINDOW_DAYS);
   const isFirstOfMonth = now.getDate() === 1;
 
-  const householdRemindersSent = await sendHouseholdReminders(today, reminderDeadline);
+  const householdRemindersSent = await sendHouseholdReminders(today);
   const committeeSummaryNotifications = isFirstOfMonth ? await sendCommitteeMonthlySummary(now) : 0;
   const { officerNotifications: officerOverdueNotifications, householdNotifications: householdOverdueNotifications } =
     await sendOfficerOverdueAlerts(today);
@@ -66,29 +72,43 @@ export async function runDailyRepaymentCheck(now: Date = new Date()): Promise<Re
   };
 }
 
-// 1. ครัวเรือน — เงินยืมที่ใกล้ครบกำหนดชำระในอีก 7 วัน (ยังไม่ปิดสัญญา)
-async function sendHouseholdReminders(today: Date, reminderDeadline: Date): Promise<number> {
-  const dueSoonLoans = await prisma.loan.findMany({
-    where: { isClosed: false, dueDate: { gte: today, lte: reminderDeadline } },
-    include: { household: { include: { village: true } } },
+// 1. ครัวเรือน — เตือนล่วงหน้าเงินยืมที่ใกล้ครบกำหนดชำระ 2 ช่วง (ยังไม่ปิดสัญญา): ก่อนครบกำหนด 1 เดือน
+// และก่อนครบกำหนด 1 สัปดาห์ พอดี (เทียบเป็นวัน ไม่ใช่ช่วงกว้าง กันแจ้งซ้ำทุกวันตลอดเดือน) — แจ้งทั้งผ่าน
+// กระดิ่ง (Notification, ใช้ notifyUsers แทน notifyHousehold ตรงๆ เพื่อให้เห็นในระบบด้วย ไม่ใช่แค่ SMS/LINE)
+// และผูกกับครัวเรือนเจ้าของเงินยืมโดยตรง (householdId) ไม่ใช่ผู้ใช้ทุกคนในหมู่บ้านเดียวกัน
+async function sendHouseholdReminders(today: Date): Promise<number> {
+  const oneMonthMark = addDays(today, ONE_MONTH_REMINDER_DAYS);
+  const oneWeekMark = addDays(today, ONE_WEEK_REMINDER_DAYS);
+
+  // ขอบเขตบนของ query ต้องเผื่อทั้งวันของ oneMonthMark (ไม่ใช่แค่เวลา 00:00 พอดี) เพราะ dueDate ของ loan
+  // จริงอาจมีเวลาในวันนั้นที่ไม่ใช่เที่ยงคืน — ใช้ isSameDay ด้านล่างเป็นตัวตัดสินที่แม่นยำแทน
+  const queryUpperBound = addDays(oneMonthMark, 1);
+  const upcomingLoans = await prisma.loan.findMany({
+    where: { isClosed: false, dueDate: { gte: today, lt: queryUpperBound } },
+    include: { household: true },
   });
 
   let sentCount = 0;
-  for (const loan of dueSoonLoans) {
-    const villageId = loan.household.villageId;
-    const householdUsers = await prisma.user.findMany({
-      where: { role: "HOUSEHOLD", scopeVillageId: villageId },
-    });
+  for (const loan of upcomingLoans) {
+    if (!loan.dueDate) continue;
+    const isOneWeekMark = isSameDay(loan.dueDate, oneWeekMark);
+    const isOneMonthMark = isSameDay(loan.dueDate, oneMonthMark);
+    if (!isOneWeekMark && !isOneMonthMark) continue;
 
+    const periodLabel = isOneWeekMark ? "อีก 1 สัปดาห์" : "อีก 1 เดือน";
     const message =
-      `แจ้งเตือน: ครัวเรือน ${loan.household.headFirstName} ${loan.household.headLastName} ` +
-      `มียอดเงินยืมค้างชำระ ${loan.outstandingBalance.toLocaleString("th-TH")} บาท ` +
-      `ครบกำหนดชำระวันที่ ${loan.dueDate?.toLocaleDateString("th-TH") ?? "-"} กรุณาเตรียมชำระให้ตรงเวลา`;
+      `แจ้งเตือน: เงินยืมของท่านใกล้ครบกำหนดชำระใน${periodLabel} (วันที่ ${loan.dueDate.toLocaleDateString("th-TH")}) ` +
+      `ยอดคงเหลือ ${loan.outstandingBalance.toLocaleString("th-TH")} บาท กรุณาเตรียมชำระให้ตรงเวลา`;
 
-    for (const user of householdUsers) {
-      await notifyHousehold(user, message);
-      sentCount += 1;
-    }
+    const householdUsers = await prisma.user.findMany({
+      where: { role: "HOUSEHOLD", householdId: loan.householdId },
+    });
+    await notifyUsers(
+      householdUsers.map((u) => u.id),
+      message,
+      "REMINDER"
+    );
+    sentCount += householdUsers.length;
   }
   return sentCount;
 }

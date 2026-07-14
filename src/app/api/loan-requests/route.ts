@@ -5,6 +5,7 @@ import { LOAN_CEILING_DEFAULT } from "@/lib/config";
 import { getCurrentUser } from "@/lib/auth";
 import { getAllowedVillageIds, canAccessHouseholdRecord } from "@/lib/scope";
 import { ACCESS_DENIED_MESSAGE } from "@/lib/authz";
+import { notifyVillageLeadership } from "@/lib/notifications/notifyUsers";
 
 // แบบฟอร์ม 2 (แบบขอยืมเงินทุน): เฉพาะครัวเรือน (HOUSEHOLD) เป็นผู้สร้างของตนเองเท่านั้น — เจ้าหน้าที่/กรรมการ
 // ห้ามยื่นแทนครัวเรือน (ป้องกันการปลอมแปลงข้อมูลการยื่นคำร้อง)
@@ -58,6 +59,13 @@ export async function POST(request: Request) {
       requestDate: new Date(data.requestDate),
     },
   });
+
+  // แจ้งเตือนพัฒนากรผู้รับผิดชอบตำบลและประธานกรรมการหมู่บ้าน ให้เห็นคำร้องใหม่ที่รอพิจารณาทันที
+  await notifyVillageLeadership(
+    household.villageId,
+    `แจ้งเตือน: ครัวเรือน ${household.headFirstName} ${household.headLastName} ยื่นแบบขอยืมเงินทุน (ฟอร์ม 2) ใหม่ วงเงิน ${data.requestedAmount.toLocaleString("th-TH")} บาท โปรดพิจารณา`,
+    "/loan-requests"
+  );
 
   return NextResponse.json(loanRequest, { status: 201 });
 }
