@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { villageMasterDataSchema } from "@/lib/schemas";
 import { getCurrentUser } from "@/lib/auth";
-import { ACCESS_DENIED_MESSAGE, canManageMasterData } from "@/lib/authz";
+import { ACCESS_DENIED_MESSAGE, canCreateVillage } from "@/lib/authz";
 
 // Master Data (ชื่อหมู่บ้าน) — GET เปิดให้ทุกคนที่ login แล้ว (read-only), POST เฉพาะ GLOBAL_ADMIN เท่านั้น
 // รองรับ ?id= (รายการเดียว) และ ?subDistrictId= (กรองเฉพาะหมู่บ้านในตำบลนั้น — ใช้โดย AddressCombobox แบบ cascading)
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: { formErrors: ["กรุณาเข้าสู่ระบบ"] } }, { status: 401 });
 
-  if (!canManageMasterData(user)) {
+  if (!canCreateVillage(user)) {
     return NextResponse.json({ error: { formErrors: [ACCESS_DENIED_MESSAGE] } }, { status: 403 });
   }
 
@@ -39,9 +39,26 @@ export async function POST(request: Request) {
   }
   const data = parsed.data;
 
-  const subDistrict = await prisma.subDistrict.findUnique({ where: { id: data.subDistrictId } });
+  const subDistrict = await prisma.subDistrict.findUnique({
+    where: { id: data.subDistrictId },
+    include: { district: { select: { id: true, provinceId: true } } },
+  });
   if (!subDistrict) {
     return NextResponse.json({ error: { fieldErrors: { subDistrictId: ["ไม่พบตำบลที่เลือก"] } } }, { status: 404 });
+  }
+
+  // ตรวจซ้ำฝั่งเซิร์ฟเวอร์ว่าตำบลที่ส่งมาอยู่ในเขตของผู้ใช้จริง (defense in depth) — ป้องกันคำขอปลอมที่ข้ามเขต
+  // ของตนเอง แม้ฝั่งฟอร์มจะล็อกฟิลด์ไว้แล้วก็ตาม (GLOBAL_ADMIN ไม่ถูกจำกัดเขต เลือกได้อิสระทั่วประเทศ)
+  const withinJurisdiction =
+    user.role === "GLOBAL_ADMIN" ||
+    (user.role === "PROVINCIAL_ADMIN" && subDistrict.district.provinceId === user.scopeProvinceId) ||
+    (user.role === "DISTRICT_ADMIN" && subDistrict.district.id === user.scopeDistrictId) ||
+    (user.role === "SUB_DISTRICT_ADMIN" && subDistrict.id === user.scopeSubDistrictId);
+  if (!withinJurisdiction) {
+    return NextResponse.json(
+      { error: { fieldErrors: { subDistrictId: ["ตำบลที่เลือกอยู่นอกเขตพื้นที่รับผิดชอบของท่าน"] } } },
+      { status: 403 }
+    );
   }
 
   const existing = await prisma.village.findUnique({

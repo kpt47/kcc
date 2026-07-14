@@ -58,7 +58,7 @@ export function Sidebar({ user }: { user: CurrentUser }) {
 
       <div className="flex items-center justify-between gap-2 border-t border-slate-200 px-3 py-3 dark:border-slate-800">
         <ProfileMenu displayName={user.displayName} />
-        <NotificationBell />
+        <NotificationBell openUpward />
       </div>
     </aside>
   );

@@ -39,7 +39,10 @@ export function ProfileMenu({ displayName }: { displayName: string }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-1 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+        // เปิดขึ้นด้านบน (bottom-full) แทนด้านล่าง (mt-*) เพราะปุ่มนี้อยู่ที่แถบท้าย Sidebar ติดขอบล่างสุดของจอเสมอ
+        // ถ้าเปิดลงด้านล่างแบบเดิมเมนูจะเลยขอบจอลงไป มองไม่เห็น/กดไม่ได้เลย (พบจากการทดสอบจริงที่จอความสูงจำกัด)
+        // ยึดขอบซ้าย (left-0) แทนขอบขวา เพราะปุ่มอยู่ชิดขอบซ้ายสุดของแถบ ถ้ายึดขอบขวากางออกทางซ้ายจะล้นขอบจอซ้าย
+        <div className="absolute bottom-full left-0 z-30 mb-1 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
           <Link
             href="/profile"
             onClick={() => setOpen(false)}

@@ -21,7 +21,7 @@ function BellIcon() {
   );
 }
 
-export function NotificationBell() {
+export function NotificationBell({ openUpward }: { openUpward?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -90,7 +90,15 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-2 max-h-96 w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+        // เปิดขึ้นด้านบนแทนด้านล่างเมื่อใช้ในแถบท้าย Sidebar (openUpward) เพราะปุ่มอยู่ติดขอบล่างสุดของจอเสมอ
+        // เปิดลงแบบเดิม (mt-2) ตอนอยู่ใน TopNav ซึ่งอยู่ด้านบนของจอ มีที่ว่างด้านล่างเพียงพอ — และยึดขอบซ้าย
+        // (left-0) แทนขอบขวา (right-0) ตอนอยู่ใน Sidebar เพราะปุ่มอยู่ในคอลัมน์แคบชิดขอบขวาสุด ถ้ายึดขอบขวา
+        // กางออกทางซ้ายจะล้นขอบจอซ้ายไปเลย (มองไม่เห็น/กดไม่ได้เหมือนปัญหาเดิม)
+        <div
+          className={`absolute z-30 max-h-96 w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg ${
+            openUpward ? "bottom-full left-0 mb-2" : "right-0 mt-2"
+          }`}
+        >
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
             <span className="text-sm font-semibold text-slate-700">การแจ้งเตือน</span>
             {unreadNotifications.length > 0 && (

@@ -12,7 +12,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
-    "import:thai-address": "tsx prisma/importThaiAddress.mjs"
+    "import:thai-address": "tsx prisma/importThaiAddress.mjs",
+    "import:master-address": "tsx prisma/importMasterAddress.mjs"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.10",

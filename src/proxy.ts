@@ -6,7 +6,7 @@ import {
   canViewBankLedger,
   canViewVillageStatusBook,
   canViewAuditLog,
-  canManageMasterData,
+  canCreateVillage,
   canUseSmartSearch,
   isItSupportBlockedFromProgramData,
   hasMinRole,
@@ -29,7 +29,9 @@ type GuardUser = { role: GlobalRole; committeeRole: CommitteeRole | null };
 const PROTECTED_PATHS: { prefix: string; allowed: (user: GuardUser) => boolean }[] = [
   { prefix: "/bank-accounts", allowed: canViewBankLedger },
   { prefix: "/villages", allowed: canViewVillageStatusBook },
-  { prefix: "/master-data", allowed: canManageMasterData },
+  // เข้าหน้าได้ตั้งแต่พัฒนากรตำบลขึ้นไป (ขึ้นทะเบียนหมู่บ้านใหม่ได้ในเขตตน) — การจัดการจังหวัด/อำเภอ/ตำบล
+  // (ข้อมูลเขตการปกครอง) ยังคงจำกัดเฉพาะ GLOBAL_ADMIN ที่ตัวหน้าเพจเองผ่าน canManageMasterData
+  { prefix: "/master-data", allowed: canCreateVillage },
   { prefix: "/admin/audit-logs", allowed: canViewAuditLog },
   { prefix: "/reports/smart", allowed: canUseSmartSearch },
   { prefix: "/reports", allowed: (user) => hasMinRole(user, "DISTRICT_ADMIN") },

@@ -17,15 +17,30 @@ export type VillageRow = {
   subDistrict: { id: number; name: string; district: { name: string; province: { name: string } } };
 };
 
+/**
+ * ระดับการล็อกฟิลด์จังหวัด/อำเภอ/ตำบล ของฟอร์มขึ้นทะเบียนหมู่บ้านใหม่ — ค่า null ในแต่ละช่อง = ไม่ล็อก
+ * (เลือกได้อิสระ), มีค่า = ล็อกไว้ที่ค่านั้น (แสดงเป็นข้อความอ่านอย่างเดียว ไม่ใช่ dropdown) คำนวณมาจาก
+ * lib/authz.ts + master-data/page.tsx ตามสิทธิ์ของผู้ใช้ปัจจุบัน (ดูคอมเมนต์ resolveScopeLock ที่นั่น)
+ */
+export type VillageScopeLock = {
+  province: AddressOption | null;
+  district: AddressOption | null;
+  subDistrict: AddressOption | null;
+};
+
 export function VillageManager({
   villages,
   subDistricts,
   canManage,
+  canManageVillage,
+  scopeLock,
   currentUser,
 }: {
   villages: VillageRow[];
   subDistricts: { id: number; name: string }[];
   canManage: boolean;
+  canManageVillage: boolean;
+  scopeLock: VillageScopeLock;
   currentUser: Pick<{ role: GlobalRole }, "role">;
 }) {
   const router = useRouter();
@@ -35,9 +50,9 @@ export function VillageManager({
   const [editLng, setEditLng] = useState("");
   const [newVillageNo, setNewVillageNo] = useState("");
   const [newVillageName, setNewVillageName] = useState("");
-  const [newProvinceId, setNewProvinceId] = useState<number | undefined>();
-  const [newDistrictId, setNewDistrictId] = useState<number | undefined>();
-  const [newSubDistrictId, setNewSubDistrictId] = useState<number | undefined>();
+  const [newProvinceId, setNewProvinceId] = useState<number | undefined>(scopeLock.province?.id);
+  const [newDistrictId, setNewDistrictId] = useState<number | undefined>(scopeLock.district?.id);
+  const [newSubDistrictId, setNewSubDistrictId] = useState<number | undefined>(scopeLock.subDistrict?.id);
   const [newBudgetYear, setNewBudgetYear] = useState("");
   const [newLat, setNewLat] = useState("");
   const [newLng, setNewLng] = useState("");
@@ -47,14 +62,17 @@ export function VillageManager({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // ดึงรายชื่อจังหวัดทั้งหมดเฉพาะตอนฟิลด์จังหวัดไม่ถูกล็อก (ถ้าล็อกแล้วแสดงเป็นข้อความจาก scopeLock ตรงๆ
+  // ไม่ต้องดึงรายการมาให้เลือกใหม่)
   useEffect(() => {
-    if (!canManage) return;
+    if (!canManageVillage || scopeLock.province) return;
     fetch("/api/master-data/provinces")
       .then((r) => r.json())
       .then(setProvinces);
-  }, [canManage]);
+  }, [canManageVillage, scopeLock.province]);
 
   useEffect(() => {
+    if (scopeLock.district) return; // อำเภอถูกล็อกอยู่แล้ว ไม่ต้องดึงตัวเลือกอำเภอมาคำนวณซ้ำ
     if (!newProvinceId) {
       setDistrictOptions([]);
       return;
@@ -62,9 +80,10 @@ export function VillageManager({
     fetch(`/api/master-data/districts?provinceId=${newProvinceId}`)
       .then((r) => r.json())
       .then((rows) => setDistrictOptions(rows.map((d: { id: number; name: string }) => ({ id: d.id, name: d.name }))));
-  }, [newProvinceId]);
+  }, [newProvinceId, scopeLock.district]);
 
   useEffect(() => {
+    if (scopeLock.subDistrict) return; // ตำบลถูกล็อกอยู่แล้ว ไม่ต้องดึงตัวเลือกตำบลมาคำนวณซ้ำ
     if (!newDistrictId) {
       setSubDistrictOptions(subDistricts);
       return;
@@ -72,7 +91,7 @@ export function VillageManager({
     fetch(`/api/master-data/sub-districts?districtId=${newDistrictId}`)
       .then((r) => r.json())
       .then((rows) => setSubDistrictOptions(rows.map((s: { id: number; name: string }) => ({ id: s.id, name: s.name }))));
-  }, [newDistrictId, subDistricts]);
+  }, [newDistrictId, subDistricts, scopeLock.subDistrict]);
 
   async function createProvince(name: string): Promise<AddressOption | null> {
     const res = await fetch("/api/master-data/provinces", {
@@ -149,9 +168,10 @@ export function VillageManager({
     }
     setNewVillageNo("");
     setNewVillageName("");
-    setNewProvinceId(undefined);
-    setNewDistrictId(undefined);
-    setNewSubDistrictId(undefined);
+    // รีเซ็ตเฉพาะฟิลด์ที่ไม่ถูกล็อก — ฟิลด์ที่ล็อกไว้ตามเขตของผู้ใช้ต้องคงค่าเดิมไว้เสมอ ไม่กลับเป็นค่าว่าง
+    if (!scopeLock.province) setNewProvinceId(undefined);
+    if (!scopeLock.district) setNewDistrictId(undefined);
+    if (!scopeLock.subDistrict) setNewSubDistrictId(undefined);
     setNewBudgetYear("");
     setNewLat("");
     setNewLng("");
@@ -195,7 +215,7 @@ export function VillageManager({
 
   return (
     <div className="flex flex-col gap-3">
-      {canManage && (
+      {canManageVillage && (
         <form onSubmit={handleCreate} className="flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
           <div className="w-56">
             <AddressCombobox
@@ -209,6 +229,7 @@ export function VillageManager({
               }}
               currentUser={currentUser}
               onCreate={createProvince}
+              lockedLabel={scopeLock.province?.name}
               required
             />
           </div>
@@ -225,6 +246,7 @@ export function VillageManager({
               onCreate={createDistrict}
               disabled={!newProvinceId}
               placeholder={!newProvinceId ? "-- เลือกจังหวัดก่อน --" : undefined}
+              lockedLabel={scopeLock.district?.name}
               required
             />
           </div>
@@ -238,6 +260,7 @@ export function VillageManager({
               onCreate={createSubDistrict}
               disabled={!newDistrictId}
               placeholder={!newDistrictId ? "-- เลือกอำเภอก่อน --" : undefined}
+              lockedLabel={scopeLock.subDistrict?.name}
               required
             />
           </div>
