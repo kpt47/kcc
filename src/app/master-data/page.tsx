@@ -1,6 +1,4 @@
 import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
-import { DistrictManager } from "@/components/master-data/DistrictManager";
-import { SubDistrictManager } from "@/components/master-data/SubDistrictManager";
 import { VillageManager, type VillageScopeLock } from "@/components/master-data/VillageManager";
 import { prisma } from "@/lib/prisma";
 import { requireUser, type CurrentUser } from "@/lib/auth";
@@ -56,13 +54,14 @@ export default async function MasterDataPage() {
     prisma.province.findMany({ orderBy: { name: "asc" } }),
     prisma.district.findMany({
       orderBy: [{ province: { name: "asc" } }, { name: "asc" }],
-      include: { province: { select: { id: true, name: true } }, _count: { select: { subDistricts: true } } },
+      select: { id: true, name: true, province: { select: { id: true, name: true } } },
     }),
     prisma.subDistrict.findMany({
       orderBy: [{ district: { name: "asc" } }, { name: "asc" }],
-      include: {
+      select: {
+        id: true,
+        name: true,
         district: { select: { id: true, name: true, province: { select: { id: true, name: true } } } },
-        _count: { select: { villages: true } },
       },
     }),
     prisma.village.findMany({
@@ -78,33 +77,13 @@ export default async function MasterDataPage() {
   return (
     <PageContainer
       title="จัดการพื้นที่ (Master Data)"
-      subtitle={canManage ? "เพิ่ม/แก้ไข/ลบ ชื่อหมู่บ้าน ตำบล และอำเภอ" : "ข้อมูลอ้างอิงหมู่บ้าน/ตำบล/อำเภอ (ดูได้อย่างเดียว)"}
+      subtitle={canManageVillage ? "เพิ่ม/แก้ไข/ลบ ชื่อหมู่บ้านที่เข้าร่วมโครงการ กข.คจ." : "ข้อมูลอ้างอิงหมู่บ้านทั้งหมดในระบบ (ดูได้อย่างเดียว)"}
     >
-      {!canManage && (
+      {!canManageVillage && (
         <p className="rounded-2xl border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500">
-          {canManageVillage
-            ? "เพิ่มหมู่บ้านใหม่เข้าโครงการได้เฉพาะในเขตพื้นที่รับผิดชอบของท่านเท่านั้น — การจัดการจังหวัด/อำเภอ/ตำบล (ข้อมูลเขตการปกครอง) ทำได้เฉพาะผู้ดูแลระบบส่วนกลาง (GLOBAL_ADMIN)"
-            : "หน้านี้แก้ไขได้เฉพาะผู้ดูแลระบบส่วนกลาง (GLOBAL_ADMIN) เท่านั้น — ระดับอื่นดูข้อมูลได้อย่างเดียว"}
+          หน้านี้เพิ่มหมู่บ้านใหม่ได้ตั้งแต่พัฒนากรตำบลขึ้นไป — ระดับอื่นดูข้อมูลได้อย่างเดียว
         </p>
       )}
-
-      <SectionCard title="อำเภอ" description="รายชื่ออำเภอทั้งหมดในระบบ">
-        <DistrictManager
-          districts={districts}
-          provinces={provinces.map((p) => ({ id: p.id, name: p.name }))}
-          canManage={canManage}
-          currentUser={user}
-        />
-      </SectionCard>
-
-      <SectionCard title="ตำบล" description="รายชื่อตำบลทั้งหมดในระบบ">
-        <SubDistrictManager
-          subDistricts={subDistricts}
-          districts={districts.map((d) => ({ id: d.id, name: d.name }))}
-          canManage={canManage}
-          currentUser={user}
-        />
-      </SectionCard>
 
       <SectionCard title="หมู่บ้าน" description="รายชื่อหมู่บ้านทั้งหมดในระบบ">
         <VillageManager
