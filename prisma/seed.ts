@@ -58,11 +58,25 @@ async function upsertVillageHierarchy(input: {
   return { province, district, subDistrict, village };
 }
 
-async function ensureBankAccount(villageId: number, bankName: string, accountNo: string) {
+// เปิดบัญชีธนาคารให้หมู่บ้าน (ข้อมูลจำลอง) — ถือว่าลงนามอนุมัติครบ 2 ฝ่ายแล้วทันที (requestedById เป็นทั้งผู้ยื่นและ
+// ผู้ลงนามทั้งสองฝ่าย) เพื่อให้ข้อมูลทดสอบใช้บันทึกฝาก-ถอนได้เลยโดยไม่ต้องลงนามซ้ำหลัง seed เสร็จ
+async function ensureBankAccount(villageId: number, bankName: string, accountNo: string, requestedById: number) {
   const existing = await prisma.bankAccount.findFirst({ where: { villageId } });
   if (existing) return existing;
+  const now = new Date();
   return prisma.bankAccount.create({
-    data: { villageId, bankName, branch: "สาขาในตัวเมือง", accountNo, accountName: "บัญชีกองทุน กข.คจ." },
+    data: {
+      villageId,
+      bankName,
+      branch: "สาขาในตัวเมือง",
+      accountNo,
+      accountName: "บัญชีกองทุน กข.คจ.",
+      requestedById,
+      chairmanApprovedById: requestedById,
+      chairmanApprovedAt: now,
+      financeApprovedById: requestedById,
+      financeApprovedAt: now,
+    },
   });
 }
 
@@ -137,7 +151,6 @@ async function main() {
     budgetYear: 2555,
     budgetAmount: 280_000,
   });
-  const bankA = await ensureBankAccount(areaA.village.id, "ธนาคารออมสิน", "1-1111-11111-1");
   const householdMoo1 = await prisma.targetHousehold.upsert({
     where: { villageId_sequenceNo: { villageId: areaA.village.id, sequenceNo: 1 } },
     create: {
@@ -162,8 +175,6 @@ async function main() {
     budgetYear: 2555,
     budgetAmount: 280_000,
   });
-  await ensureBankAccount(areaB.village.id, "ธนาคารเพื่อการเกษตรและสหกรณ์การเกษตร", "2-2222-22222-2");
-
   // พื้นที่ทดสอบ RBAC ครบ 8 ระดับ: จ.ก. > อ.ข. > ต.ค. > หมู่บ้าน ง. (รหัสผ่านทุกบัญชี: password1234)
   // ตั้งชื่อพื้นที่ตามลำดับตัวอักษรไทย (ก./ข./ค./ง.) ให้ตรงกับชื่อผู้ใช้งานแต่ละระดับตามที่ผู้ใช้ระบุไว้
   const areaTest = await upsertVillageHierarchy({
@@ -176,7 +187,6 @@ async function main() {
     budgetYear: 2555,
     budgetAmount: 280_000,
   });
-  await ensureBankAccount(areaTest.village.id, "ธนาคารออมสิน", "9-9999-99999-9");
   const householdTest = await prisma.targetHousehold.upsert({
     where: { villageId_sequenceNo: { villageId: areaTest.village.id, sequenceNo: 1 } },
     create: {
@@ -408,6 +418,17 @@ async function main() {
       password: TEST_PASSWORD_LEVELS,
     }),
   ]);
+
+  // เปิดบัญชีธนาคารให้แต่ละพื้นที่ (ต้องรอสร้างผู้ใช้ก่อน เพื่อใช้ประธานของแต่ละหมู่บ้านเป็นผู้ยื่น/ลงนามอนุมัติ)
+  const byUsername = (username: string) => users.find((u) => u.username === username)!;
+  const bankA = await ensureBankAccount(areaA.village.id, "ธนาคารออมสิน", "1-1111-11111-1", byUsername("chair_moo1").id);
+  await ensureBankAccount(
+    areaB.village.id,
+    "ธนาคารเพื่อการเกษตรและสหกรณ์การเกษตร",
+    "2-2222-22222-2",
+    byUsername("chair_moo2").id
+  );
+  await ensureBankAccount(areaTest.village.id, "ธนาคารออมสิน", "9-9999-99999-9", byUsername("chair_test").id);
 
   console.log(`seed พื้นที่และผู้ใช้งานสำเร็จ: ${users.map((u) => u.username).join(", ")}`);
   console.log(`- บัญชีเดิม (รหัสผ่าน: ${TEST_PASSWORD}): admin_global, province_a, district_a, dev_tambon_a/b, chair_moo1/2, sec_moo1, fin_moo1, house_moo1, it_support`);

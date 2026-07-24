@@ -653,6 +653,18 @@ export const editLoanRepaymentSchema = z.object({
 export type EditLoanRepaymentValues = z.infer<typeof editLoanRepaymentSchema>;
 
 // ---------------------------------------------------------------------------
+// คำขอเปิดบัญชีธนาคารใหม่ (เล่มเขียว) — ต้องผ่านการลงนามอนุมัติ 2 ฝ่ายก่อนใช้บันทึกฝาก-ถอนได้ (ดู /approve)
+// ---------------------------------------------------------------------------
+export const bankAccountRequestSchema = z.object({
+  villageId: z.number().int().positive(),
+  bankName: z.string().trim().min(1, "กรุณาระบุชื่อธนาคาร"),
+  branch: z.string().trim().optional(),
+  accountNo: z.string().trim().min(1, "กรุณาระบุเลขที่บัญชี"),
+  accountName: z.string().trim().min(1, "กรุณาระบุชื่อบัญชี"),
+});
+export type BankAccountRequestValues = z.infer<typeof bankAccountRequestSchema>;
+
+// ---------------------------------------------------------------------------
 // บันทึกรายการฝาก-ถอนเงิน (เล่มเขียว) — ยอดคงเหลือคำนวณโดยเซิร์ฟเวอร์ ไม่รับจาก client
 // ---------------------------------------------------------------------------
 export const bankTransactionEntrySchema = z

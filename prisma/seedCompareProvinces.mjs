@@ -192,6 +192,11 @@ const PROVINCES = [
 ];
 
 async function main() {
+  // ใช้ GLOBAL_ADMIN ที่มีอยู่แล้วในระบบเป็นผู้ยื่น/ลงนามอนุมัติเปิดบัญชี (สคริปต์นี้ไม่สร้างผู้ใช้เอง — ดูคอมเมนต์บนสุดของไฟล์)
+  const adminUser = await prisma.user.findFirstOrThrow({
+    where: { role: "GLOBAL_ADMIN" },
+  });
+
   for (const p of PROVINCES) {
     const province = await prisma.province.findFirstOrThrow({ where: { name: p.province } });
     let district = await prisma.district.findFirst({ where: { provinceId: province.id, name: { startsWith: "เมือง" } } });
@@ -219,6 +224,7 @@ async function main() {
 
     let bankAccount = await prisma.bankAccount.findFirst({ where: { villageId: village.id } });
     if (!bankAccount) {
+      const now = new Date();
       bankAccount = await prisma.bankAccount.create({
         data: {
           villageId: village.id,
@@ -226,6 +232,11 @@ async function main() {
           branch: `สาขา${province.name}`,
           accountNo: `0-${village.id}-00000-0`,
           accountName: `บัญชีกองทุน กข.คจ. ${p.village}`,
+          requestedById: adminUser.id,
+          chairmanApprovedById: adminUser.id,
+          chairmanApprovedAt: now,
+          financeApprovedById: adminUser.id,
+          financeApprovedAt: now,
         },
       });
     }

@@ -1,5 +1,7 @@
 import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
 import { BankTransactionAction } from "@/components/workflow/BankTransactionAction";
+import { NewBankAccountAction } from "@/components/workflow/NewBankAccountAction";
+import { BankAccountApproveAction } from "@/components/workflow/BankAccountApproveAction";
 import { BankLedgerTable } from "@/components/workflow/BankLedgerTable";
 import { BankLogo } from "@/components/workflow/BankLogo";
 import { SearchSortList, type SearchSortItem } from "@/components/shared/SearchSortList";
@@ -7,7 +9,16 @@ import { SmartOmnibar } from "@/components/dashboard/SmartOmnibar";
 import { prisma } from "@/lib/prisma";
 import { THEMES } from "@/lib/theme";
 import { requireUser } from "@/lib/auth";
-import { canCreateBankTransaction, canEditOrDeleteBankTransaction, canViewBankLedger, BANK_LEDGER_DENIED_MESSAGE } from "@/lib/authz";
+import {
+  canCreateBankTransaction,
+  canEditOrDeleteBankTransaction,
+  canViewBankLedger,
+  canRequestBankAccount,
+  canSignBankAccountAsChairman,
+  canSignBankAccountAsFinance,
+  isBankAccountFullyApproved,
+  BANK_LEDGER_DENIED_MESSAGE,
+} from "@/lib/authz";
 import { getAllowedVillageIds, scopeWhereDirect } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
@@ -43,12 +54,20 @@ export default async function BankAccountsPage() {
   });
   const showTransactionAction = canCreateBankTransaction(user);
   const showManageActions = canEditOrDeleteBankTransaction(user);
+  const canSignChairman = canSignBankAccountAsChairman(user);
+  const canSignFinance = canSignBankAccountAsFinance(user);
+
+  // เสนอให้ยื่นคำขอเปิดบัญชีใหม่ ถ้าหมู่บ้านของตนเอง (กรณีเลขาฯ/ฝ่ายการเงิน) ยังไม่มีบัญชีธนาคารในระบบ
+  const ownVillageHasAccount = accounts.some((acc) => acc.villageId === user.scopeVillageId);
+  const showRequestNewAccount = canRequestBankAccount(user) && user.scopeVillageId != null && !ownVillageHasAccount;
 
   return (
     <PageContainer title="บัญชีคุมเงินฝาก" subtitle="บัญชีเงินฝากธนาคารของกองทุนหมู่บ้าน กข.คจ.">
       <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${theme.badgeBg} ${theme.badgeText}`}>
         {theme.bookLabel}
       </span>
+
+      {showRequestNewAccount && user.scopeVillageId != null && <NewBankAccountAction villageId={user.scopeVillageId} />}
 
       <SmartOmnibar />
 
@@ -95,27 +114,45 @@ export default async function BankAccountsPage() {
                         </p>
                       </div>
                     </div>
-                    <span className={`shrink-0 rounded-full ${theme.badgeBg} ${theme.badgeText} px-2.5 py-1 text-xs font-semibold`}>
-                      คงเหลือ {latestBalance.toLocaleString("th-TH")} บาท
-                    </span>
+                    {isBankAccountFullyApproved(acc) ? (
+                      <span className={`shrink-0 rounded-full ${theme.badgeBg} ${theme.badgeText} px-2.5 py-1 text-xs font-semibold`}>
+                        คงเหลือ {latestBalance.toLocaleString("th-TH")} บาท
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                        รอลงนามอนุมัติ
+                      </span>
+                    )}
                   </div>
 
-                  <BankLedgerTable
-                    rows={acc.transactions.map((t) => ({
-                      id: t.id,
-                      transactionDate: t.transactionDate.toISOString(),
-                      documentNo: t.documentNo,
-                      description: t.description,
-                      depositAmount: t.depositAmount,
-                      withdrawAmount: t.withdrawAmount,
-                      balance: t.balance,
-                      note: t.note,
-                      passbookImageUrl: t.passbookImageUrl,
-                    }))}
-                    canManage={showManageActions}
-                  />
+                  {isBankAccountFullyApproved(acc) ? (
+                    <>
+                      <BankLedgerTable
+                        rows={acc.transactions.map((t) => ({
+                          id: t.id,
+                          transactionDate: t.transactionDate.toISOString(),
+                          documentNo: t.documentNo,
+                          description: t.description,
+                          depositAmount: t.depositAmount,
+                          withdrawAmount: t.withdrawAmount,
+                          balance: t.balance,
+                          note: t.note,
+                          passbookImageUrl: t.passbookImageUrl,
+                        }))}
+                        canManage={showManageActions}
+                      />
 
-                  {showTransactionAction && <BankTransactionAction bankAccountId={acc.id} />}
+                      {showTransactionAction && <BankTransactionAction bankAccountId={acc.id} />}
+                    </>
+                  ) : (
+                    <BankAccountApproveAction
+                      accountId={acc.id}
+                      chairmanApproved={acc.chairmanApprovedById !== null}
+                      financeApproved={acc.financeApprovedById !== null}
+                      canSignChairman={canSignChairman}
+                      canSignFinance={canSignFinance}
+                    />
+                  )}
                 </div>
               ),
             };

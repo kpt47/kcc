@@ -103,6 +103,29 @@ export function canCreateBankTransaction(user: Pick<CurrentUser, "role" | "commi
   return user.committeeRole === "FINANCE_MEMBER";
 }
 
+/** ยื่นคำขอเปิดบัญชีธนาคารใหม่ให้หมู่บ้าน — เลขานุการหรือฝ่ายการเงินเป็นผู้ยื่น จากนั้นต้องรอลงนามอนุมัติ 2 ฝ่าย */
+export function canRequestBankAccount(user: Pick<CurrentUser, "role" | "committeeRole">): boolean {
+  return user.committeeRole === "SECRETARY" || user.committeeRole === "FINANCE_MEMBER";
+}
+
+/** ลงนามอนุมัติเปิดบัญชีธนาคารในฐานะประธาน (ลายเซ็นที่ 1 ของ Multi-signature) */
+export function canSignBankAccountAsChairman(user: Pick<CurrentUser, "role" | "committeeRole">): boolean {
+  return user.committeeRole === "CHAIRMAN" || hasMinRole(user, "SUB_DISTRICT_ADMIN");
+}
+
+/** ลงนามอนุมัติเปิดบัญชีธนาคารในฐานะฝ่ายการเงิน (ลายเซ็นที่ 2 ของ Multi-signature) */
+export function canSignBankAccountAsFinance(user: Pick<CurrentUser, "role" | "committeeRole">): boolean {
+  return user.committeeRole === "FINANCE_MEMBER" || hasMinRole(user, "SUB_DISTRICT_ADMIN");
+}
+
+/** การเปิดบัญชีถือว่าอนุมัติสมบูรณ์เมื่อมีทั้งลายเซ็นประธานและฝ่ายการเงินแล้ว — ก่อนหน้านั้นบันทึกฝาก-ถอนไม่ได้ */
+export function isBankAccountFullyApproved(account: {
+  chairmanApprovedById: number | null;
+  financeApprovedById: number | null;
+}): boolean {
+  return account.chairmanApprovedById !== null && account.financeApprovedById !== null;
+}
+
 /** การยืนยันยอดหนี้ประจำปี: เฉพาะประธานคณะกรรมการ (CHAIRMAN) เท่านั้นเป็นผู้กำหนดวันที่ยืนยันยอดของหมู่บ้าน */
 export function canSetDebtConfirmationDate(user: Pick<CurrentUser, "role" | "committeeRole">): boolean {
   return user.committeeRole === "CHAIRMAN";

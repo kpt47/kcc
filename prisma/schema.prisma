@@ -138,6 +138,9 @@ model User {
   approvedLoans              Loan[]            @relation("LoanApprovedBy")
   chairmanApprovedTransactions BankTransaction[] @relation("BankTxnChairmanApproval")
   financeApprovedTransactions  BankTransaction[] @relation("BankTxnFinanceApproval")
+  requestedBankAccounts        BankAccount[]     @relation("BankAccountRequestedBy")
+  chairmanApprovedBankAccounts BankAccount[]     @relation("BankAccountChairmanApproval")
+  financeApprovedBankAccounts  BankAccount[]     @relation("BankAccountFinanceApproval")
   notifications               Notification[]
   uploadedMeetingRecords       VillageMeetingRecord[]
   passwordResetOtps            PasswordResetOtp[]
@@ -459,6 +462,9 @@ model LoanRepayment {
 }
 
 /// บัญชีเงินฝากธนาคารของหมู่บ้าน (เล่มเขียว: บัญชีคุมเงินฝากธนาคาร)
+/// การเปิดบัญชีธนาคารใหม่ต้องผ่าน Multi-signature เช่นเดียวกับรายการถอนเงิน (ดู BankTransaction ด้านล่าง):
+/// CHAIRMAN ลงนาม 1 เสียง + FINANCE_MEMBER อย่างน้อย 1 เสียง คนละคนกัน ก่อนถือว่าเปิดบัญชีสมบูรณ์
+/// (isFullyApproved = ทั้งสองฟิลด์ไม่เป็น null) — ระหว่างรอลงนามยังบันทึกรายการฝาก-ถอนไม่ได้ ดู src/lib/authz.ts
 model BankAccount {
   id          Int    @id @default(autoincrement())
   villageId   Int
@@ -467,6 +473,18 @@ model BankAccount {
   branch      String? // สาขา
   accountNo   String? // เลขที่บัญชี
   accountName String? // ชื่อบัญชี
+
+  requestedById Int
+  requestedBy   User @relation("BankAccountRequestedBy", fields: [requestedById], references: [id])
+
+  chairmanApprovedById Int?
+  chairmanApprovedBy   User?     @relation("BankAccountChairmanApproval", fields: [chairmanApprovedById], references: [id])
+  chairmanApprovedAt   DateTime?
+  financeApprovedById  Int?
+  financeApprovedBy    User?     @relation("BankAccountFinanceApproval", fields: [financeApprovedById], references: [id])
+  financeApprovedAt    DateTime?
+
+  createdAt DateTime @default(now())
 
   transactions BankTransaction[]
 }

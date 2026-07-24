@@ -32,20 +32,6 @@ async function main() {
     await prisma.village.update({ where: { id: village.id }, data: { budgetAmount: 280_000 } });
   }
 
-  // ============ บัญชีเงินฝากธนาคาร (เล่มเขียว) ============
-  let bankAccount = await prisma.bankAccount.findFirst({ where: { villageId: village.id } });
-  if (!bankAccount) {
-    bankAccount = await prisma.bankAccount.create({
-      data: {
-        villageId: village.id,
-        bankName: "ธนาคารออมสิน",
-        branch: "สาขานครนายก",
-        accountNo: "0-2601-20260-6",
-        accountName: "บัญชีกองทุน กข.คจ. บ้านสวนหงษ์",
-      },
-    });
-  }
-
   // ============ ผู้ใช้งานระดับต่างๆ (สร้างก่อน เพื่อใช้ชื่อประธาน/ฝ่ายการเงินในรายการธุรกรรม) ============
   async function upsertUser({ username, firstName, lastName, phoneNumber, email, role, committeeRole, positionTitle, scope, householdId, householdProfile }) {
     return prisma.user.upsert({
@@ -141,6 +127,26 @@ async function main() {
     committeeRole: "FINANCE_MEMBER",
     scope: { scopeVillageId: village.id },
   });
+
+  // ============ บัญชีเงินฝากธนาคาร (เล่มเขียว) — ถือว่าลงนามอนุมัติครบ 2 ฝ่ายแล้วทันที ============
+  let bankAccount = await prisma.bankAccount.findFirst({ where: { villageId: village.id } });
+  if (!bankAccount) {
+    const now = new Date();
+    bankAccount = await prisma.bankAccount.create({
+      data: {
+        villageId: village.id,
+        bankName: "ธนาคารออมสิน",
+        branch: "สาขานครนายก",
+        accountNo: "0-2601-20260-6",
+        accountName: "บัญชีกองทุน กข.คจ. บ้านสวนหงษ์",
+        requestedById: chairUser.id,
+        chairmanApprovedById: chairUser.id,
+        chairmanApprovedAt: now,
+        financeApprovedById: finUser.id,
+        financeApprovedAt: now,
+      },
+    });
+  }
 
   await upsertUser({
     username: "it_nayok",
