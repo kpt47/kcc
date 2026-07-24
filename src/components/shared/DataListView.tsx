@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { SortableHeader } from "@/components/official-reports/SortableHeader";
+import { ExportMenu } from "@/components/dashboard/ExportMenu";
 
 // หมายเหตุสำคัญ: ห้ามส่ง function (เช่น render/formatter/sortValue) เป็น prop จาก Server Component เข้ามาที่นี่
 // เพราะ DataListView เป็น Client Component — function ไม่สามารถ serialize ข้าม RSC boundary ได้ (เหมือนกับ
@@ -18,6 +19,8 @@ export type DataListRow = {
   cells: Record<string, ReactNode>;
   sortValues: Record<string, string | number>;
   card: ReactNode;
+  /** ค่าดิบสำหรับ export Excel เท่านั้น (ไม่บังคับ) — ใส่มาเมื่อต้องการเปิดใช้ปุ่ม Export (ดู prop exportFilename) */
+  excelRow?: Record<string, string | number>;
 };
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [50, 100, 250, 500];
@@ -36,6 +39,7 @@ export function DataListView({
   searchPlaceholder = "ค้นหา...",
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
   defaultPageSize = DEFAULT_PAGE_SIZE_OPTIONS[0],
+  exportFilename,
 }: {
   rows: DataListRow[];
   columns: DataListColumnDef[];
@@ -45,6 +49,10 @@ export function DataListView({
   searchPlaceholder?: string;
   pageSizeOptions?: number[];
   defaultPageSize?: number;
+  /** ใส่มาเพื่อเปิดใช้ปุ่ม Export (PDF/Excel/PNG) ของรายการทั้งหมดที่ผ่านการค้นหา/จัดเรียงแล้ว (ไม่จำกัดแค่หน้าปัจจุบัน
+   *  สำหรับ Excel — ส่วน PDF/PNG เป็นภาพหน้าจอ จึงจับได้เฉพาะแถวที่แสดงอยู่ในหน้าปัจจุบันเท่านั้น ตามข้อจำกัดของ
+   *  html2canvas เดียวกับ DataTableCard) ไม่ใส่ = ไม่แสดงปุ่ม Export (ของเดิม ไม่กระทบหน้าอื่นที่ใช้ component นี้) */
+  exportFilename?: string;
 }) {
   const [view, setView] = useState<"table" | "cards">(defaultView);
   const [q, setQ] = useState("");
@@ -52,6 +60,7 @@ export function DataListView({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [pageSize, setPageSize] = useState(defaultPageSize);
   const [page, setPage] = useState(1);
+  const captureRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -130,6 +139,9 @@ export function DataListView({
               🔲 กล่อง
             </button>
           </div>
+          {exportFilename && (
+            <ExportMenu targetRef={captureRef} excelRows={() => sorted.map((r) => r.excelRow ?? {})} filename={exportFilename} />
+          )}
         </div>
       </div>
 
@@ -137,43 +149,45 @@ export function DataListView({
         พบ {sorted.length.toLocaleString("th-TH")} รายการ{q.trim() ? ` (จากทั้งหมด ${rows.length.toLocaleString("th-TH")} รายการ)` : ""}
       </p>
 
-      {sorted.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">{emptyMessage}</p>
-      ) : view === "table" ? (
-        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-          <table className="w-full min-w-max text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {columns.map((c) => (
-                  <SortableHeader key={c.key} label={c.label} field={c.key} sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((row) => (
-                <tr key={row.key} className="border-b border-slate-100 last:border-0">
+      <div ref={captureRef} className="bg-white dark:bg-slate-900">
+        {sorted.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">{emptyMessage}</p>
+        ) : view === "table" ? (
+          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+            <table className="w-full min-w-max text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                   {columns.map((c) => (
-                    <td
-                      key={c.key}
-                      className={`whitespace-nowrap px-3 py-2 text-slate-700 ${
-                        c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : "text-left"
-                      }`}
-                    >
-                      {row.cells[c.key]}
-                    </td>
+                    <SortableHeader key={c.key} label={c.label} field={c.key} sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {pageRows.map((row) => (
-            <div key={row.key}>{row.card}</div>
-          ))}
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {pageRows.map((row) => (
+                  <tr key={row.key} className="border-b border-slate-100 last:border-0">
+                    {columns.map((c) => (
+                      <td
+                        key={c.key}
+                        className={`whitespace-nowrap px-3 py-2 text-slate-700 ${
+                          c.align === "right" ? "text-right" : c.align === "center" ? "text-center" : "text-left"
+                        }`}
+                      >
+                        {row.cells[c.key]}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {pageRows.map((row) => (
+              <div key={row.key}>{row.card}</div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 pt-1">

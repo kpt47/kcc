@@ -775,6 +775,12 @@ export const visitLogSchema = z.object({
 });
 export type VisitLogValues = z.infer<typeof visitLogSchema>;
 
+// พัฒนาการอำเภอ/พัฒนาการจังหวัดพิมพ์คำแนะนำต่อท้ายบันทึกการติดตามของพัฒนากรตำบล — /api/visit-logs/[id]
+export const visitLogAdviceSchema = z.object({
+  advice: z.string().trim().min(1, "กรุณากรอกคำแนะนำ").max(2000, "คำแนะนำยาวเกินไป"),
+});
+export type VisitLogAdviceValues = z.infer<typeof visitLogAdviceSchema>;
+
 export const editBankTransactionSchema = z.object({
   transactionDate: z.string().min(1).optional(),
   documentNo: z.string().optional(),

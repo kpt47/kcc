@@ -149,6 +149,7 @@ model User {
   createdDebtConfirmationRounds DebtConfirmationRound[]
   debtConfirmationsMade         DebtConfirmation[]
   recordedVisitLogs             VisitLog[]
+  advisedVisitLogs               VisitLog[] @relation("VisitLogAdvisedBy")
   submittedInquiries            HouseholdInquiry[]
   repliedInquiries              HouseholdInquiry[] @relation("InquiryRepliedBy")
 }
@@ -357,6 +358,10 @@ model VisitLog {
   notes        String? // ประเด็นที่ติดตามและข้อสังเกตแนะนำ
   recordedById Int
   recordedBy   User     @relation(fields: [recordedById], references: [id])
+  advice       String? // คำแนะนำจากพัฒนาการอำเภอ/พัฒนาการจังหวัด — เห็นได้ทุกฝ่ายที่มีสิทธิ์ดูบันทึกนี้ (canViewVillageStatusBook)
+  advisedById  Int?
+  advisedBy    User?     @relation("VisitLogAdvisedBy", fields: [advisedById], references: [id])
+  advisedAt    DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

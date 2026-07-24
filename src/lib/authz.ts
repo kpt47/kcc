@@ -287,6 +287,12 @@ export function canCreateVisitLog(user: Pick<CurrentUser, "role">): boolean {
 
 export const VISIT_LOG_DENIED_MESSAGE = "Access Denied: สิทธิ์การบันทึกการติดตามสงวนไว้สำหรับพัฒนากรประจำตำบลเท่านั้น";
 
+/** พิมพ์ "คำแนะนำ" ต่อท้ายบันทึกการติดตามของพัฒนากรตำบล — เฉพาะพัฒนาการอำเภอและพัฒนาการจังหวัดเท่านั้น
+ *  (ไม่รวมพัฒนากรตำบลเจ้าของบันทึกเอง หรือส่วนกลาง — ตามที่ผู้ใช้กำหนดไว้ชัดเจน) */
+export function canAdviseVisitLog(user: Pick<CurrentUser, "role">): boolean {
+  return user.role === "DISTRICT_ADMIN" || user.role === "PROVINCIAL_ADMIN";
+}
+
 /**
  * นำเข้าบัญชีผู้ใช้งานระดับครัวเรือนจากไฟล์ Excel เป็นชุดใหญ่ (Bulk Import) — เฉพาะประธานคณะกรรมการหมู่บ้าน
  * (จำกัดเฉพาะหมู่บ้านตนเอง) หรือพัฒนากรประจำตำบล (เลือกได้ทุกหมู่บ้านในตำบลตนเอง) เท่านั้น

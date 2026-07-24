@@ -6,25 +6,42 @@ import { ThaiDateField } from "@/components/form/ThaiDateField";
 
 const VISIT_TYPE_OPTIONS = ["ร่วมประชุม", "ติดตามหนี้สิน", "ตรวจเยี่ยมครัวเรือน", "ให้คำแนะนำ", "อื่นๆ"];
 
-export function NewVisitLogModal({ villages }: { villages: { id: number; villageName: string; villageNo: string }[] }) {
+export type ExistingVisitLog = {
+  id: number;
+  villageId: number;
+  visitDate: string;
+  visitType: string;
+  notes: string | null;
+  attachmentUrls: string[];
+};
+
+// ใช้ทั้งเพิ่มบันทึกใหม่ (POST) และแก้ไขบันทึกเดิม (PATCH) — ส่ง prop `existing` มาเพื่อเปิดโหมดแก้ไข
+// (ปุ่มเปิดจะแสดงเป็น "แก้ไข" แบบเล็กแทนปุ่ม "+ บันทึกการติดตามใหม่" แบบใหญ่)
+export function NewVisitLogModal({
+  villages,
+  existing,
+}: {
+  villages: { id: number; villageName: string; villageNo: string }[];
+  existing?: ExistingVisitLog;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [villageId, setVillageId] = useState(villages[0]?.id ?? "");
-  const [visitDate, setVisitDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [visitType, setVisitType] = useState(VISIT_TYPE_OPTIONS[0]);
-  const [notes, setNotes] = useState("");
-  const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
+  const [villageId, setVillageId] = useState(existing?.villageId ?? villages[0]?.id ?? "");
+  const [visitDate, setVisitDate] = useState(existing?.visitDate.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
+  const [visitType, setVisitType] = useState(existing?.visitType ?? VISIT_TYPE_OPTIONS[0]);
+  const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [attachmentUrls, setAttachmentUrls] = useState<string[]>(existing?.attachmentUrls ?? []);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function resetForm() {
-    setVillageId(villages[0]?.id ?? "");
-    setVisitDate(new Date().toISOString().slice(0, 10));
-    setVisitType(VISIT_TYPE_OPTIONS[0]);
-    setNotes("");
-    setAttachmentUrls([]);
+    setVillageId(existing?.villageId ?? villages[0]?.id ?? "");
+    setVisitDate(existing?.visitDate.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
+    setVisitType(existing?.visitType ?? VISIT_TYPE_OPTIONS[0]);
+    setNotes(existing?.notes ?? "");
+    setAttachmentUrls(existing?.attachmentUrls ?? []);
     setError(null);
   }
 
@@ -63,8 +80,8 @@ export function NewVisitLogModal({ villages }: { villages: { id: number; village
       return;
     }
     setSubmitting(true);
-    const res = await fetch("/api/visit-logs", {
-      method: "POST",
+    const res = await fetch(existing ? `/api/visit-logs/${existing.id}` : "/api/visit-logs", {
+      method: existing ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         villageId: Number(villageId),
@@ -86,7 +103,15 @@ export function NewVisitLogModal({ villages }: { villages: { id: number; village
   }
 
   if (!open) {
-    return (
+    return existing ? (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex min-h-9 items-center rounded-full border border-slate-300 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+      >
+        แก้ไข
+      </button>
+    ) : (
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -100,7 +125,7 @@ export function NewVisitLogModal({ villages }: { villages: { id: number; village
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4">
       <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
-        <h2 className="text-lg font-bold text-slate-900">บันทึกการติดตามและข้อแนะนำ</h2>
+        <h2 className="text-lg font-bold text-slate-900">{existing ? "แก้ไขบันทึกการติดตาม" : "บันทึกการติดตามและข้อแนะนำ"}</h2>
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-500">หมู่บ้าน</label>
