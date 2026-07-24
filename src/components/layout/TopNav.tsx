@@ -3,10 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 import { LogoutButton } from "@/components/dashboard/LogoutButton";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { getNavLinks, withSectionHeaders, NAV_GROUP_STYLE } from "@/lib/navLinks";
+import { getNavLinks, groupNavLinks, NAV_GROUP_STYLE, type NavLink } from "@/lib/navLinks";
+import { useNavAccordion } from "@/lib/useNavAccordion";
 import { BRAND, BRAND_ALT } from "@/lib/branding";
 import type { CurrentUser } from "@/lib/auth";
 
@@ -28,10 +30,39 @@ function CloseIcon() {
 
 // แถบหัวข้อสำหรับหน้าจอมือถือ/แท็บเล็ตขนาดเล็กเท่านั้น (ต่ำกว่า md) — บนเดสก์ท็อป/แท็บเล็ตขนาดใหญ่
 // ใช้ Sidebar.tsx แทน (แสดงตลอดเวลาด้านข้าง ไม่ต้องกดเปิด) ดู AppShell.tsx สำหรับการสลับ layout
+//
+// แต่ละกลุ่มเมนู (สมุดบัญชี 4 เล่ม/แบบฟอร์มและเอกสาร/รายงานและค้นหา/ผู้ดูแลระบบ) แสดงเป็น Accordion พับ/กางได้
+// อิสระต่อกัน (ดู lib/useNavAccordion.ts) เหมือนใน Sidebar.tsx เดสก์ท็อป — ค่าเริ่มต้นกางไว้ทุกกลุ่ม
 export function TopNav({ user }: { user: CurrentUser }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const links = getNavLinks(user);
+  const { ungrouped, groups } = groupNavLinks(links);
+  const { collapsed, toggle } = useNavAccordion();
+
+  function renderLink(l: NavLink) {
+    const active = pathname === l.href;
+    const Icon = l.icon;
+    return (
+      <Link
+        key={l.href}
+        href={l.href}
+        onClick={() => setOpen(false)}
+        className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium ${
+          active
+            ? "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
+            : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+        }`}
+      >
+        <Icon
+          className={`h-5 w-5 shrink-0 ${
+            l.iconColor ?? (active ? "text-blue-700 dark:text-blue-400" : "text-slate-400 dark:text-slate-500")
+          }`}
+        />
+        {l.label}
+      </Link>
+    );
+  }
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 dark:border-slate-800 dark:bg-slate-900/95 dark:supports-[backdrop-filter]:bg-slate-900/80 md:hidden">
@@ -62,43 +93,29 @@ export function TopNav({ user }: { user: CurrentUser }) {
       {open && (
         <nav className="max-h-[calc(100dvh-3.5rem)] overflow-y-auto border-t border-slate-200 bg-white px-4 py-3 pb-16 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-col gap-1">
-            {withSectionHeaders(links).map((item, idx) => {
-              if (item.type === "header") {
-                const style = NAV_GROUP_STYLE[item.group];
-                const HeaderIcon = style?.icon;
-                return (
-                  <p
-                    key={`header-${item.label}-${idx}`}
-                    className={`mt-4 mb-1.5 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide first:mt-0 ${
+            {ungrouped.map(renderLink)}
+            {groups.map((g) => {
+              const style = NAV_GROUP_STYLE[g.group];
+              const HeaderIcon = style?.icon;
+              const isCollapsed = !!collapsed[g.group];
+              return (
+                <div key={g.group} className="mt-4 first:mt-0">
+                  <button
+                    type="button"
+                    onClick={() => toggle(g.group)}
+                    aria-expanded={!isCollapsed}
+                    className={`mb-1.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition ${
                       style ? `${style.bg} ${style.text}` : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                     }`}
                   >
-                    {HeaderIcon && <HeaderIcon className="h-4 w-4 shrink-0" />}
-                    <span>{item.label}</span>
-                  </p>
-                );
-              }
-              const l = item.link;
-              const active = pathname === l.href;
-              const Icon = l.icon;
-              return (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  onClick={() => setOpen(false)}
-                  className={`flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-base font-medium ${
-                    active
-                      ? "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
-                      : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  <Icon
-                    className={`h-5 w-5 shrink-0 ${
-                      l.iconColor ?? (active ? "text-blue-700 dark:text-blue-400" : "text-slate-400 dark:text-slate-500")
-                    }`}
-                  />
-                  {l.label}
-                </Link>
+                    <span className="flex items-center gap-2">
+                      {HeaderIcon && <HeaderIcon className="h-4 w-4 shrink-0" />}
+                      <span>{g.label}</span>
+                    </span>
+                    <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
+                  </button>
+                  {!isCollapsed && <div className="flex flex-col gap-1">{g.links.map(renderLink)}</div>}
+                </div>
               );
             })}
             <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">

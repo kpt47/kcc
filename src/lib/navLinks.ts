@@ -35,7 +35,7 @@ import type { CurrentUser } from "./auth";
 
 export type NavLink = { href: string; label: string; icon: LucideIcon; iconColor?: string; group?: string };
 
-// ป้ายหัวข้อคั่นกลุ่มเมนู (แสดงเฉพาะเมื่อมีมากกว่า 1 กลุ่มปรากฏอยู่จริงในรายการ — ดู withSectionHeaders)
+// ป้ายหัวข้อคั่นกลุ่มเมนู (แสดงเฉพาะเมื่อมีมากกว่า 1 กลุ่มปรากฏอยู่จริงในรายการ — ดู groupNavLinks)
 export const NAV_GROUP_LABELS: Record<string, string> = {
   books: "สมุดบัญชี 4 เล่ม",
   forms: "แบบฟอร์มและเอกสาร",
@@ -43,7 +43,7 @@ export const NAV_GROUP_LABELS: Record<string, string> = {
   admin: "ผู้ดูแลระบบ",
 };
 
-export type NavListItem = { type: "link"; link: NavLink } | { type: "header"; label: string; group: string };
+export type NavGroup = { group: string; label: string; links: NavLink[] };
 
 // ไอคอน+สีของ "หัวข้อคั่นกลุ่ม" เอง (คนละชุดกับ BOOK_ICON_COLOR ที่เป็นสีของลิงก์ย่อยแต่ละอัน) — เลือกให้ต่างจาก
 // ไอคอน/สีของลิงก์ย่อยในกลุ่มเดียวกัน เพื่อไม่ให้สับสนว่าอันไหนคือหัวข้อคั่น แสดงเป็นแถบพื้นสี (banner) ให้เด่น
@@ -56,24 +56,30 @@ export const NAV_GROUP_STYLE: Record<string, { icon: LucideIcon; text: string; b
 };
 
 /**
- * แปลง NavLink[] แบบเรียบให้มีหัวข้อคั่นกลุ่มแทรกอยู่ด้วย — ถ้ามีแค่กลุ่มเดียว (หรือไม่มีกลุ่มเลย เช่น
- * เมนู HOUSEHOLD/IT_SUPPORT ที่สั้นอยู่แล้ว) จะไม่แสดงหัวข้อใดๆ เลย เพื่อไม่ให้เพิ่มความรกโดยไม่จำเป็น
+ * แยก NavLink[] แบบเรียบออกเป็นลิงก์ที่ไม่มีกลุ่ม (แสดงเรียงบนสุดเหมือนเดิม) กับกลุ่มที่มีหัวข้อคั่น (ไว้ทำ
+ * เป็น Accordion แต่ละกลุ่มพับ/กางแยกกันได้) — ถ้ามีแค่กลุ่มเดียว (หรือไม่มีกลุ่มเลย เช่น เมนู HOUSEHOLD/
+ * IT_SUPPORT ที่สั้นอยู่แล้ว) ถือว่าไม่มีกลุ่ม (groups ว่าง) เพื่อไม่ให้เพิ่มความรกโดยไม่จำเป็น
  * ใช้ร่วมกันทั้ง Sidebar.tsx (เดสก์ท็อป) และ TopNav.tsx (เมนู Hamburger มือถือ)
  */
-export function withSectionHeaders(links: NavLink[]): NavListItem[] {
+export function groupNavLinks(links: NavLink[]): { ungrouped: NavLink[]; groups: NavGroup[] } {
   const distinctGroups = new Set(links.map((l) => l.group).filter(Boolean));
-  if (distinctGroups.size <= 1) return links.map((link) => ({ type: "link", link }));
+  if (distinctGroups.size <= 1) return { ungrouped: links, groups: [] };
 
-  const result: NavListItem[] = [];
-  let lastGroup: string | undefined;
+  const ungrouped: NavLink[] = [];
+  const groups: NavGroup[] = [];
   for (const link of links) {
-    if (link.group && link.group !== lastGroup) {
-      result.push({ type: "header", label: NAV_GROUP_LABELS[link.group] ?? link.group, group: link.group });
+    if (!link.group) {
+      ungrouped.push(link);
+      continue;
     }
-    lastGroup = link.group;
-    result.push({ type: "link", link });
+    const last = groups[groups.length - 1];
+    if (last && last.group === link.group) {
+      last.links.push(link);
+    } else {
+      groups.push({ group: link.group, label: NAV_GROUP_LABELS[link.group] ?? link.group, links: [link] });
+    }
   }
-  return result;
+  return { ungrouped, groups };
 }
 
 // สีไอคอนอ้างอิงสีปกสมุดบัญชีแต่ละเล่ม (ตรงกับ lib/theme.ts) — ใช้ text-* เพราะ Sidebar/BottomNav
