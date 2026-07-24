@@ -1,36 +1,372 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ระบบ กข.คจ. — โครงการแก้ไขปัญหาความยากจน
 
-## Getting Started
+ระบบบริหารจัดการกองทุนหมู่บ้าน **โครงการแก้ไขปัญหาความยากจน (กข.คจ.)** แบบดิจิทัล พัฒนาเพื่อทดแทน
+"สมุดบัญชี 4 เล่ม" แบบกระดาษเดิม ให้คณะกรรมการหมู่บ้าน พัฒนากร และผู้บริหารทุกระดับบันทึกข้อมูล
+ติดตามหนี้สิน และจัดทำรายงานราชการได้สะดวก แม่นยำ และตรวจสอบย้อนหลังได้ ตามระเบียบกระทรวงมหาดไทย
+ว่าด้วยการบริหารและการใช้จ่ายเงินโครงการแก้ไขปัญหาความยากจน พ.ศ. 2553
 
-First, run the development server:
+> พัฒนาระบบโดย นายวสันต์ มาชัยภูมิ นักทรัพยากรบุคคลชำนาญการ
+> ศูนย์ศึกษาและพัฒนาชุมชนนครนายก กรมการพัฒนาชุมชน กระทรวงมหาดไทย
 
+---
+
+## สารบัญ
+
+- [เทคโนโลยีที่ใช้](#เทคโนโลยีที่ใช้)
+- [แนวคิดหลัก: สมุดบัญชี 4 เล่ม](#แนวคิดหลัก-สมุดบัญชี-4-เล่ม)
+- [บทบาทผู้ใช้งาน 8 ระดับ (RBAC)](#บทบาทผู้ใช้งาน-8-ระดับ-rbac)
+- [ขอบเขตการมองเห็นข้อมูล (Data Scope)](#ขอบเขตการมองเห็นข้อมูล-data-scope)
+- [โครงสร้างหน้าจอและเมนู](#โครงสร้างหน้าจอและเมนู)
+- [ขั้นตอนการทำงานหลัก (Workflow)](#ขั้นตอนการทำงานหลัก-workflow)
+- [ตรรกะทางธุรกิจสำคัญ](#ตรรกะทางธุรกิจสำคัญ)
+- [การแจ้งเตือน](#การแจ้งเตือน)
+- [ฟีเจอร์เสริมสำหรับครัวเรือน](#ฟีเจอร์เสริมสำหรับครัวเรือน)
+- [เอกสารราชการ (PDF)](#เอกสารราชการ-pdf)
+- [ความปลอดภัยและ PDPA](#ความปลอดภัยและ-pdpa)
+- [การติดตั้งและรัน](#การติดตั้งและรัน)
+- [ตัวแปรแวดล้อม (Environment Variables)](#ตัวแปรแวดล้อม-environment-variables)
+- [บัญชีทดสอบ](#บัญชีทดสอบ)
+- [การ Deploy](#การ-deploy)
+- [โครงสร้างโปรเจกต์](#โครงสร้างโปรเจกต์)
+
+---
+
+## เทคโนโลยีที่ใช้
+
+| ส่วน | เทคโนโลยี |
+|---|---|
+| Framework | Next.js 16.2.10 (App Router, Turbopack) + React 19 |
+| ภาษา | TypeScript |
+| ORM / ฐานข้อมูล | Prisma 7.8 + PostgreSQL (Neon) — dev รองรับ better-sqlite3 ด้วย |
+| UI | Tailwind CSS 3.4 + Headless UI + lucide-react + next-themes (light/dark) |
+| ฟอร์ม/ตรวจสอบ | react-hook-form + zod |
+| กราฟ | Recharts |
+| แผนที่ | Leaflet + react-leaflet + OpenStreetMap (Overpass API) |
+| PDF | Puppeteer / puppeteer-core + @sparticuz/chromium (serverless) |
+| Excel | ExcelJS / xlsx |
+| รหัสผ่าน | bcryptjs (cost 10) |
+| CAPTCHA | Cloudflare Turnstile |
+| ที่เก็บไฟล์ | Vercel Blob / Netlify Blobs / local disk (auto fallback) |
+
+> **หมายเหตุ:** ระบบนี้ **ไม่มีการเชื่อมต่อ AI/LLM ใดๆ** — การจัดลำดับความเสี่ยง การให้ดาว และการค้นหา
+> ทั้งหมดเป็น rule-based logic ล้วนๆ จึงไม่มีต้นทุนด้าน AI
+
+---
+
+## แนวคิดหลัก: สมุดบัญชี 4 เล่ม
+
+ระบบจำลองสมุดบัญชีกระดาษ 4 เล่มของโครงการ กข.คจ. เป็นดิจิทัล โดยใช้สีประจำเล่มเดิมเพื่อให้ผู้ใช้คุ้นเคย:
+
+| เล่ม | สี | หน้าจอ | เนื้อหา |
+|---|---|---|---|
+| เล่ม 7 | 🟣 ม่วง | `/households` | ทะเบียนครัวเรือนเป้าหมาย |
+| เล่ม 6 | 🟤 น้ำตาล | `/villages` | สถานะหมู่บ้าน / การส่งมอบ-รับมอบงาน |
+| เล่ม 8 | 🟢 เขียว | `/bank-accounts` | บัญชีคุมเงินฝากธนาคาร |
+| เล่ม 9 | 🟡 เหลือง | `/loans` | บัญชีคุมลูกหนี้ (เงินยืม/การชำระคืน) |
+
+---
+
+## บทบาทผู้ใช้งาน 8 ระดับ (RBAC)
+
+หลักการ: **แยกอำนาจหน้าที่โดยเด็ดขาด (Strict Separation of Duties)** — เอกสาร/บัญชีแต่ละเล่มเป็นของ
+ตำแหน่งใดตำแหน่งหนึ่งเท่านั้น ผู้บริหารระดับสูง "เห็น" ข้อมูลตามเขตพื้นที่ได้ แต่ "แก้ไขไม่ได้"
+
+ลำดับขั้น (`ROLE_RANK` ใน `src/lib/authz.ts`):
+
+| Role | ลำดับ | คำอธิบาย |
+|---|---|---|
+| `IT_SUPPORT` | -1 | ผู้ดูแลระบบด้านเทคนิค — เห็นเฉพาะรายชื่อผู้ใช้และ Audit Log **ห้ามเข้าถึงข้อมูลสมุดทะเบียนทุกเล่ม** |
+| `HOUSEHOLD` | 0 | ครัวเรือนเป้าหมาย — เห็นเฉพาะข้อมูลของตนเอง |
+| `VILLAGE_COMMITTEE` | 1 | คณะกรรมการหมู่บ้าน (มีตำแหน่งย่อย ดูด้านล่าง) |
+| `SUB_DISTRICT_ADMIN` | 2 | พัฒนากรผู้รับผิดชอบตำบล |
+| `DISTRICT_ADMIN` | 3 | พัฒนาการอำเภอ |
+| `PROVINCIAL_ADMIN` | 4 | พัฒนาการจังหวัด |
+| `GLOBAL_ADMIN` | 5 | กรมการพัฒนาชุมชน (ส่วนกลาง) |
+
+**ตำแหน่งย่อยของกรรมการหมู่บ้าน** (`committeeRole`): `CHAIRMAN` (ประธาน), `SECRETARY` (เลขานุการ),
+`FINANCE_MEMBER` (ฝ่ายการเงิน), `NORMAL_MEMBER` (กรรมการทั่วไป)
+
+### สิทธิ์แยกตามตำแหน่ง (สรุปจุดสำคัญ)
+
+- **บันทึกเงินยืมก้อนใหม่** → เฉพาะเลขานุการ (`SECRETARY`)
+- **อนุมัติเงินยืม / อนุมัติแบบเสนอโครงการ / กำหนดวันยืนยันยอดหนี้** → เฉพาะประธาน (`CHAIRMAN`)
+- **บันทึกรับชำระคืน** → เลขานุการ หรือ ฝ่ายการเงิน (แต่แก้/ลบย้อนหลังได้เฉพาะเลขานุการ)
+- **บันทึกรายการฝาก-ถอนธนาคาร** → เฉพาะฝ่ายการเงิน (`FINANCE_MEMBER`)
+- **การถอนเงินธนาคาร** → ต้องลงนาม 2 ฝ่าย (Multi-signature): ประธาน + ฝ่ายการเงิน
+- **แก้ไขรายได้ จปฐ. / ลำดับที่ครัวเรือน** → เฉพาะพัฒนากรตำบล (`SUB_DISTRICT_ADMIN`)
+- **ให้ความเห็นพัฒนากร** → เฉพาะพัฒนากรตำบล
+- **จัดการชื่อจังหวัด/อำเภอ/ตำบล (Master Data)** → เฉพาะส่วนกลาง (`GLOBAL_ADMIN`)
+- **รายงานภาวะหนี้สิน** → ดูได้เฉพาะระดับที่ตรงกับตน (หมู่บ้าน/อำเภอ/จังหวัด) ไม่ใช่ "ระดับขึ้นไป"
+
+> รายละเอียดฟังก์ชัน `canXxx()` ทั้งหมดอยู่ใน `src/lib/authz.ts`
+
+---
+
+## ขอบเขตการมองเห็นข้อมูล (Data Scope)
+
+`getAllowedVillageIds(user)` ใน `src/lib/scope.ts` จำกัดหมู่บ้านที่แต่ละ role มองเห็น:
+
+| Role | เห็นข้อมูล |
+|---|---|
+| `GLOBAL_ADMIN` | ทุกหมู่บ้านทั่วประเทศ (`"all"`) |
+| `PROVINCIAL_ADMIN` | ทุกหมู่บ้านในจังหวัดที่รับผิดชอบ |
+| `DISTRICT_ADMIN` | ทุกหมู่บ้านในอำเภอที่รับผิดชอบ |
+| `SUB_DISTRICT_ADMIN` | ทุกหมู่บ้านในตำบลที่รับผิดชอบ |
+| `VILLAGE_COMMITTEE` | เฉพาะหมู่บ้านของตน |
+| `HOUSEHOLD` | เฉพาะครัวเรือนของตน (จำกัด 2 ชั้น: หมู่บ้าน + `householdId`) |
+| `IT_SUPPORT` | ไม่เห็นข้อมูลโครงการเลย |
+
+Helper สร้างเงื่อนไข Prisma: `scopeWhereDirect()`, `scopeWhereViaHousehold()`, `householdScopeWhere()`,
+`householdSelfScopeWhere()`, `canAccessHouseholdRecord()`
+
+---
+
+## โครงสร้างหน้าจอและเมนู
+
+### เมนูของครัวเรือน (HOUSEHOLD)
+หน้าหลัก · ข้อมูลครัวเรือนของฉัน (เล่มม่วง) · ประวัติหนี้สินของฉัน (เล่มเหลือง) · แนะนำอาชีพ! · แหล่งทุนใกล้ฉัน
+
+### เมนูของ IT_SUPPORT
+จัดการผู้ใช้งาน · Audit Logs
+
+### เมนูของ role ระดับกำกับดูแล (กรรมการ / พัฒนากร / ผู้บริหาร)
+- **บนสุด:** หน้าหลัก · Dashboard (`/overview-report`) · สรุปรายงาน (`/dashboard`)
+- **สมุดบัญชี 4 เล่ม:** ทะเบียนครัวเรือน · สถานะหมู่บ้าน¹ · บัญชีคุมเงินฝาก² · บัญชีคุมลูกหนี้
+- **แบบฟอร์มและเอกสาร:** แบบเสนอโครงการ · แบบขอยืมเงินทุน · รายงาน/วาระการประชุม · บันทึกการติดตาม¹
+- **รายงานและค้นหา:** วิเคราะห์ข้อมูล (Smart Report) · แบบรายงานภาวะหนี้สินฯ
+- **ผู้ดูแลระบบ:** จัดการผู้ใช้งาน³ · จัดการพื้นที่⁴ · Audit Logs⁴ · เกี่ยวกับโปรแกรม
+
+¹ เฉพาะพัฒนากรตำบล/อำเภอ/จังหวัด &nbsp; ² กรรมการเห็นเฉพาะฝ่ายการเงิน &nbsp;
+³ กรรมการเห็นเฉพาะประธาน/เลขาฯ &nbsp; ⁴ เฉพาะส่วนกลาง
+
+> ระบบมีทั้งหมด **30 หน้า** และ **~90 API endpoints** — ดูรายการเมนูจริงต่อ role ที่ `src/lib/navLinks.ts`
+
+---
+
+## ขั้นตอนการทำงานหลัก (Workflow)
+
+1. **เพิ่มหมู่บ้าน** — ส่วนกลาง/ผู้บริหารขึ้นทะเบียนหมู่บ้านเข้าโครงการ ผูกกับตำบล/อำเภอ/จังหวัดจริง
+2. **เพิ่มครัวเรือนเป้าหมาย** — กรรมการ/พัฒนากรลงทะเบียนครัวเรือน (เล่มม่วง) เรียงตามรายได้ก่อนยืมน้อยไปมาก
+3. **เสนอโครงการ / ขอยืมเงินทุน** — ครัวเรือนยื่นแบบฟอร์ม → พัฒนากรตำบลให้ความเห็น → ประธานอนุมัติ
+   (**ต้องมีรายงาน/วาระการประชุมแนบในระบบก่อน** จึงจะพิจารณาได้ — ดู `src/lib/meetings.ts`)
+4. **ทำสัญญา / รับเงินยืม** — ระบบออกสัญญายืมเงินและใบสำคัญจ่าย PDF ผูกกับเล่มเหลือง+เล่มเขียวอัตโนมัติ
+5. **ติดตาม / รับชำระคืน** — กรรมการบันทึกการรับคืนแต่ละงวด ระบบคำนวณยอดคงเหลือและจัดระดับความเสี่ยงอัตโนมัติ
+6. **สรุปและรายงาน** — ผู้บริหารติดตามผ่าน Dashboard และพิมพ์แบบรายงานภาวะหนี้สินฯ ส่งหน่วยงานต้นสังกัด
+
+---
+
+## ตรรกะทางธุรกิจสำคัญ
+
+### การจัดระดับความเสี่ยง (`src/lib/risk.ts`)
+คำนวณจาก `Loan.dueDate` เทียบวันปัจจุบัน (คำนวณใหม่ทุกวันผ่าน cron):
+- **NORMAL (ปกติ)** — ยังเหลือเวลาก่อนครบกำหนดมากกว่า 15 วัน หรือชำระตรงงวด
+- **WATCHLIST (เฝ้าระวัง)** — ใกล้ครบกำหนดภายใน 15 วัน จนถึงเลยกำหนดไม่เกิน 30 วัน
+- **HIGH_RISK (เสี่ยงสูง)** — เลยกำหนดชำระเกิน 30 วัน
+
+### การให้ดาวครัวเรือน (`src/lib/rating.ts`)
+วัดจากสถานะสัญญาที่แย่ที่สุดในบรรดาเงินยืมที่ยังไม่ปิด:
+- ผิดสัญญา (`isDefaulted`) → ⭐ 1 ดาว "ผิดสัญญา"
+- เสี่ยงสูง → ⭐ 1 ดาว "เสี่ยงสูง" · เฝ้าระวัง → ⭐⭐⭐ 3 ดาว "เฝ้าระวัง" · ปกติ → ⭐⭐⭐⭐ 4 ดาว "ปกติ"
+- เคยกู้และปิดสัญญาครบทุกก้อน → ⭐⭐⭐⭐⭐ 5 ดาว "ปิดสัญญาครบถ้วน"
+- ยังไม่เคยกู้ → ไม่แสดงดาว
+
+### การคำนวณยอดคงเหลือ (`src/lib/ledger.ts`)
+คำนวณใหม่ทั้งหมด (full recompute) เสมอ เพื่อให้การแก้/ลบรายการย้อนหลังถูกต้อง:
+- **เงินยืม:** รวมเฉพาะการชำระที่ `status = APPROVED` → `outstandingBalance = max(0, amount − ชำระแล้ว)`;
+  ปิดสัญญาอัตโนมัติเมื่อยอดคงเหลือ ≤ 0
+- **ธนาคาร:** replay ทุกรายการเรียงตามวันที่ → ยอดคงเหลือ `+= ฝาก − ถอน`
+
+### เกตวาระการประชุม (`src/lib/meetings.ts`)
+พัฒนากร/ประธานจะให้ความเห็นหรืออนุมัติไม่ได้ ถ้ายังไม่มี `VillageMeetingRecord` ของหมู่บ้าน
+(วันที่ประชุม ≤ วันนี้) — ป้องกันการอนุมัติลัดขั้นตอนโดยไม่มีมติที่ประชุม
+
+---
+
+## การแจ้งเตือน
+
+ช่องทาง: **แจ้งเตือนในระบบ (กระดิ่ง)** · **SMS** (mock) · **LINE** (Messaging API) · **Telegram** (Bot API)
+— ทุกช่องทางภายนอกทำงานแบบ mock (log แทนการส่งจริง) ถ้ายังไม่ตั้งค่า API key
+
+Cron รายวัน 08:00 (`src/lib/notifications/repayment-check.ts` ผ่าน `src/instrumentation.ts`):
+1. เตือนครัวเรือนล่วงหน้าก่อนครบกำหนด (ตาม `reminderLeadDays` ค่าเริ่มต้น 7 วัน)
+2. สรุปยอดรายเดือนถึงเลขาฯ/ฝ่ายการเงิน (เฉพาะวันที่ 1 ของเดือน)
+3. เตือนพัฒนากรตำบลถึงครัวเรือนที่เลยกำหนด
+4. แจ้งเตือนครัวเรือนที่ค้างชำระโดยตรง
+5. คำนวณระดับความเสี่ยงเงินยืมใหม่ทั้งหมด
+
+---
+
+## ฟีเจอร์เสริมสำหรับครัวเรือน
+
+- **แนะนำอาชีพ** (`/career-ideas`) — ข้อมูล **คงที่ที่รวบรวมไว้ล่วงหน้า** (ไม่ใช่ AI) จากแหล่งราชการ/ธนาคาร/
+  สื่อเกษตร จับคู่กับครัวเรือนด้วยการ match คำสำคัญ (`src/lib/careerIdeas.ts`)
+- **แหล่งทุนใกล้ฉัน** (`/funding-sources`) — ดึงพิกัดกองทุน/สหกรณ์/ตลาดนัด/สถาบันการเงินชุมชนในรัศมี 40 กม.
+  ผ่าน Overpass API (OpenStreetMap ฟรี ไม่ต้องใช้ key มี fallback 2 mirror) + แสดงกองทุน กข.คจ. หมู่บ้าน
+  ใกล้เคียงจากฐานข้อมูลระบบเอง (`src/lib/fundingSourcesNearby.ts`)
+- **Smart Search** (SmartOmnibar) — ค้นข้ามสมุดบัญชี 5 ประเภท (หมู่บ้าน/ครัวเรือน/ปีงบประมาณ/วาระประชุม/
+  บัญชีธนาคาร) กรองตามสิทธิ์อัตโนมัติ (`src/lib/dashboardSearch.ts`)
+
+---
+
+## เอกสารราชการ (PDF)
+
+สร้างผ่าน Puppeteer (`src/lib/pdf/`) ตรงตามแบบฟอร์มแนบท้ายระเบียบฯ พ.ศ. 2553:
+
+- แบบเสนอโครงการ · แบบขอยืมเงินทุน · สัญญายืมเงินทุน · ใบสำคัญจ่ายเงินยืม
+- บัญชีทะเบียนครัวเรือนเป้าหมาย (เล่มม่วง) · แบบรายงานภาวะหนี้สินและฐานะทางการเงิน
+- รายงานลำดับชั้น: แบบ 26(1) ระดับหมู่บ้าน/สรุปอำเภอ · แบบ 26(2) สรุปจังหวัด ·
+  รายงานสภาพปัญหาการบริหารเงินทุน · รายงานฐานข้อมูลหมู่บ้าน (ข้อ 27)
+
+---
+
+## ความปลอดภัยและ PDPA
+
+- **Session:** cookie `kkc_session` (httpOnly, sameSite=lax, secure ใน production) อายุ 7 วัน เก็บใน DB;
+  ระงับบัญชี (`isActive=false`) มีผลทันที (`src/lib/auth.ts`)
+- **PDPA (พ.ร.บ. คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562):** ต้องกดยินยอมก่อนใช้งาน เก็บเป็นประวัติ
+  (`policyVersion` ปัจจุบัน `"1.0"`) — เปลี่ยนเวอร์ชันแล้วต้องยินยอมใหม่ (`src/lib/pdpa.ts`)
+- **Audit Log:** บันทึกเหตุการณ์ login/OTP/CAPTCHA/การผูกบัญชี ตรวจสอบย้อนหลังได้
+- **กู้คืนรหัสผ่าน:** OTP ทางอีเมล (เก็บเฉพาะ hash หมดอายุ 5 นาที) + Cloudflare Turnstile CAPTCHA
+
+---
+
+## การติดตั้งและรัน
+
+### ความต้องการ
+- Node.js (แนะนำ LTS ล่าสุด) + npm
+- ฐานข้อมูล PostgreSQL (แนะนำ Neon — ฟรี)
+
+### ขั้นตอน
 ```bash
+# 1. ติดตั้ง dependencies (จะรัน prisma generate อัตโนมัติผ่าน postinstall)
+npm install
+
+# 2. สร้างไฟล์ .env แล้วใส่ค่า DATABASE_URL (ดูหัวข้อ Environment Variables)
+
+# 3. สร้าง/ซิงก์ schema เข้าฐานข้อมูล
+npx prisma db push
+
+# 4. (ตัวเลือก) ใส่ข้อมูลจำลองสำหรับทดสอบ
+npx tsx prisma/seedNakhonNayok.mjs
+
+# 5. รัน dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+เปิด http://localhost:3000
+
+### สคริปต์ที่มี
+| คำสั่ง | หน้าที่ |
+|---|---|
+| `npm run dev` | รัน dev server (Turbopack) |
+| `npm run build` | build สำหรับ production |
+| `npm start` | รัน production server |
+| `npm run lint` | ตรวจ ESLint |
+| `npm run db:studio` | เปิด Prisma Studio |
+| `npm run import:master-address` | นำเข้าข้อมูลเขตการปกครองจริง |
+
+---
+
+## ตัวแปรแวดล้อม (Environment Variables)
+
+ทุกตัวยกเว้น `DATABASE_URL` เป็น optional — ถ้าไม่ตั้งค่า บริการนั้นจะทำงานแบบ mock (log แทนการส่งจริง)
+
+```env
+# ฐานข้อมูล (บังคับ) — Neon Postgres connection string
+DATABASE_URL="postgresql://..."
+
+# อีเมล OTP รีเซ็ตรหัสผ่าน (ไม่ตั้ง = mock)
+SMTP_HOST=
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=
+
+# Cloudflare Turnstile CAPTCHA (ไม่ตั้ง = ข้าม CAPTCHA)
+TURNSTILE_SECRET_KEY=
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=
+
+# LINE Messaging API (ไม่ตั้ง = mock)
+LINE_CHANNEL_ID=
+LINE_CHANNEL_SECRET=
+LINE_CHANNEL_ACCESS_TOKEN=
+LINE_LOGIN_REDIRECT_URI=
+
+# Telegram Bot API (ไม่ตั้ง = mock)
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_BOT_USERNAME=
+TELEGRAM_WEBHOOK_SECRET=
+
+# ที่เก็บไฟล์อัปโหลด (Vercel Blob) — ถ้าไม่ตั้งจะใช้ local disk / Netlify Blobs อัตโนมัติ
+BLOB_READ_WRITE_TOKEN=
+
+# ป้องกัน cron endpoint (แนะนำตั้งใน production)
+CRON_SECRET=
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## บัญชีทดสอบ
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+จากชุดข้อมูลจำลอง `prisma/seedNakhonNayok.mjs` (พื้นที่: บ้านสวนหงษ์ ต.สาริกา อ.เมืองนครนายก จ.นครนายก)
+**รหัสผ่านทุกบัญชี:** `password1234`
 
-## Learn More
+| Username | Role / ตำแหน่ง |
+|---|---|
+| `admin_nayok` | ส่วนกลาง (GLOBAL_ADMIN) |
+| `prov_nayok` | พัฒนาการจังหวัด |
+| `dist_nayok` | พัฒนาการอำเภอ |
+| `subdist_nayok` | พัฒนากรตำบล |
+| `chair_nayok` | ประธานกรรมการหมู่บ้าน |
+| `fin_nayok` | กรรมการฝ่ายการเงิน |
+| `it_nayok` | ผู้ดูแลระบบ (IT_SUPPORT) |
+| `house_nayok` | ครัวเรือน — สมหญิง มีสุข (ปกติ) |
+| `house_nayok1` | ครัวเรือน — สมศักดิ์ ใจดี (ยังไม่กู้) |
+| `house_nayok3` | ครัวเรือน — ประเสริฐ พูนทรัพย์ (เฝ้าระวัง) |
+| `house_nayok4` | ครัวเรือน — วิไล ยากจน (เสี่ยงสูง/ผิดสัญญา) |
+| `house_nayok5` | ครัวเรือน — มานะ ตั้งใจ (ปิดสัญญา+กู้ซ้ำ) |
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## การ Deploy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+รองรับ 2 เส้นทางหลัก (ทั้งคู่ฟรี):
 
-## Deploy on Vercel
+- **Vercel** (แนะนำ) — โค้ดเตรียมพร้อมแล้ว: `vercel.json` ตั้ง cron รายวัน, PDF ใช้ `@sparticuz/chromium`,
+  เก็บไฟล์ผ่าน Vercel Blob — ดูขั้นตอนละเอียดที่ [`DEPLOY_VERCEL.md`](./DEPLOY_VERCEL.md)
+- **VPS + PM2** — ใช้ `ecosystem.config.js` (auto-restart, port 3000) คู่กับ Nginx
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Cron job: `GET /api/cron/repayment-check` เวลา 08:00 ทุกวัน (ควรป้องกันด้วย `CRON_SECRET`)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## โครงสร้างโปรเจกต์
+
+```
+webapp/
+├── prisma/
+│   ├── schema.prisma          # 30 ตาราง (เขตปกครอง/ผู้ใช้/สมุด 4 เล่ม/เอกสาร/ระบบ)
+│   ├── seedNakhonNayok.mjs     # ข้อมูลจำลองครบ 8 ระดับ + 5 ครัวเรือน
+│   └── migrations/
+├── src/
+│   ├── app/                    # หน้าจอ (30) + API routes (~90)
+│   │   ├── api/                # endpoints ทั้งหมด
+│   │   └── */page.tsx          # หน้าจอผู้ใช้
+│   ├── components/             # UI components (แยกตามโดเมน)
+│   ├── lib/
+│   │   ├── authz.ts            # สิทธิ์ RBAC (canXxx)
+│   │   ├── scope.ts            # ขอบเขตข้อมูลตาม role
+│   │   ├── navLinks.ts         # เมนูตาม role
+│   │   ├── auth.ts             # session/cookie
+│   │   ├── risk.ts             # จัดระดับความเสี่ยง
+│   │   ├── rating.ts           # ให้ดาวครัวเรือน
+│   │   ├── ledger.ts           # คำนวณยอดคงเหลือ
+│   │   ├── meetings.ts         # เกตวาระการประชุม
+│   │   ├── pdpa.ts             # PDPA consent
+│   │   ├── notifications/      # แจ้งเตือน + cron
+│   │   ├── pdf/                # สร้างเอกสาร PDF
+│   │   └── ...
+│   └── instrumentation.ts      # ลงทะเบียน cron รายวัน
+├── public/geo/                 # ข้อมูล GeoJSON เขตการปกครอง
+├── vercel.json / netlify.toml / ecosystem.config.js
+└── DEPLOY_VERCEL.md
+```
