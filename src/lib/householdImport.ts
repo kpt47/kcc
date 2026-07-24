@@ -26,6 +26,9 @@ export const IMPORT_COLUMNS = [
   { key: "occupation", header: "อาชีพ" },
   { key: "consentPersonName", header: "ชื่อผู้ให้ความยินยอม" },
   { key: "consentRelation", header: "ความสัมพันธ์กับผู้ให้ความยินยอม" },
+  // ไม่บังคับกรอก — ถ้าใส่มา จะบันทึกลง TargetHousehold.phoneNumber (ทะเบียนครัวเรือนเป้าหมาย เล่มม่วง) ด้วย
+  // คนละฟิลด์กับ "เบอร์โทรศัพท์" ด้านบนซึ่งเป็นเบอร์ของบัญชีผู้ใช้งาน (ใช้ส่ง SMS แจ้งเตือน)
+  { key: "householdPhoneNumber", header: "เบอร์โทรศัพท์ครัวเรือน" },
 ] as const;
 
 export type ImportRowInput = {
@@ -40,6 +43,7 @@ export type ImportRowInput = {
   occupation?: string | null;
   consentPersonName?: string | null;
   consentRelation?: string | null;
+  householdPhoneNumber?: string | null;
 };
 
 export type ValidatedImportRow = ImportRowInput & {
@@ -141,11 +145,18 @@ export async function validateImportRows(
       errors.push("อายุต้องเป็นจำนวนเต็มระหว่าง 0-150");
     }
 
+    // ไม่บังคับกรอก — ถ้ามีค่าต้องเป็นรูปแบบเบอร์โทรศัพท์ที่ถูกต้องเท่านั้น
+    const householdPhoneNumber = row.householdPhoneNumber?.trim() || null;
+    if (householdPhoneNumber && !PHONE_REGEX.test(householdPhoneNumber)) {
+      errors.push("เบอร์โทรศัพท์ครัวเรือนต้องเป็นตัวเลข 9-10 หลัก และขึ้นต้นด้วย 0");
+    }
+
     results.push({
       ...row,
       sequenceNo,
       phoneNumber,
       username,
+      householdPhoneNumber,
       rowNumber: i + 1,
       valid: errors.length === 0,
       errors,

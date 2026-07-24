@@ -17,6 +17,7 @@ type ImportRow = {
   occupation?: string | null;
   consentPersonName?: string | null;
   consentRelation?: string | null;
+  householdPhoneNumber?: string | null;
   valid: boolean;
   errors: string[];
   matchedHouseholdId: number | null;
@@ -35,6 +36,7 @@ const EDITABLE_FIELDS: { key: keyof ImportRow; label: string }[] = [
   { key: "occupation", label: "อาชีพ" },
   { key: "consentPersonName", label: "ชื่อผู้ให้ความยินยอม" },
   { key: "consentRelation", label: "ความสัมพันธ์" },
+  { key: "householdPhoneNumber", label: "เบอร์โทรศัพท์ครัวเรือน" },
 ];
 
 export function ImportHouseholdsModal({ role, committeeRole }: { role: string; committeeRole: string | null }) {

@@ -39,32 +39,41 @@ export async function POST(request: Request) {
 
   const passwordHashes = await Promise.all(revalidated.rows.map((r) => hashPassword(r.password!)));
 
-  const createdIds = await prisma.$transaction(
-    revalidated.rows.map((r, i) =>
-      prisma.user.create({
-        data: {
-          username: r.username!,
-          passwordHash: passwordHashes[i],
-          role: "HOUSEHOLD",
-          phoneNumber: r.phoneNumber!,
-          // ไฟล์ Excel นำเข้าไม่มีคอลัมน์อีเมล — สร้างอีเมลชั่วคราวจาก username (ไม่ซ้ำแน่นอน เพราะ username unique)
-          // ครัวเรือนแก้ไขเป็นอีเมลจริงของตนเองภายหลังได้เองที่หน้า "บัญชีของฉัน" (/profile)
-          email: `${r.username!}@kokkhocho.local`,
-          scopeVillageId: villageId,
-          householdId: r.matchedHouseholdId!,
-          householdProfile: {
-            create: {
-              age: r.age !== undefined && r.age !== null && r.age !== "" ? Number(r.age) : undefined,
-              occupation: r.occupation || undefined,
-              consentPersonName: r.consentPersonName || undefined,
-              consentRelation: r.consentRelation || undefined,
-            },
+  // แต่ละแถวมี 1-2 คำสั่งในทรานแซกชันเดียวกัน: เปิดบัญชีผู้ใช้เสมอ + อัปเดตเบอร์โทรศัพท์ครัวเรือน (ทะเบียนเล่มม่วง)
+  // เฉพาะแถวที่กรอก "เบอร์โทรศัพท์ครัวเรือน" มา (ไม่บังคับ) — ไม่ทับข้อมูลเดิมด้วยค่าว่างถ้าไม่ได้กรอก
+  const operations = revalidated.rows.flatMap((r, i) => {
+    const createUser = prisma.user.create({
+      data: {
+        username: r.username!,
+        passwordHash: passwordHashes[i],
+        role: "HOUSEHOLD",
+        phoneNumber: r.phoneNumber!,
+        // ไฟล์ Excel นำเข้าไม่มีคอลัมน์อีเมล — สร้างอีเมลชั่วคราวจาก username (ไม่ซ้ำแน่นอน เพราะ username unique)
+        // ครัวเรือนแก้ไขเป็นอีเมลจริงของตนเองภายหลังได้เองที่หน้า "บัญชีของฉัน" (/profile)
+        email: `${r.username!}@kokkhocho.local`,
+        scopeVillageId: villageId,
+        householdId: r.matchedHouseholdId!,
+        householdProfile: {
+          create: {
+            age: r.age !== undefined && r.age !== null && r.age !== "" ? Number(r.age) : undefined,
+            occupation: r.occupation || undefined,
+            consentPersonName: r.consentPersonName || undefined,
+            consentRelation: r.consentRelation || undefined,
           },
         },
-        select: { id: true },
-      })
-    )
-  );
+      },
+      select: { id: true },
+    });
+    if (!r.householdPhoneNumber) return [createUser];
+    const updateHouseholdPhone = prisma.targetHousehold.update({
+      where: { id: r.matchedHouseholdId! },
+      data: { phoneNumber: r.householdPhoneNumber },
+      select: { id: true },
+    });
+    return [createUser, updateHouseholdPhone];
+  });
 
-  return NextResponse.json({ createdCount: createdIds.length });
+  await prisma.$transaction(operations);
+
+  return NextResponse.json({ createdCount: revalidated.rows.length });
 }
