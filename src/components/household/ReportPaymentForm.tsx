@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Banknote, CalendarDays, MessageSquare, Send } from "lucide-react";
 import { EvidenceUploadButton } from "@/components/workflow/EvidenceUploadButton";
 
 export function ReportPaymentForm() {
@@ -51,32 +52,50 @@ export function ReportPaymentForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
       <h3 className="text-sm font-bold text-slate-900">แจ้งชำระค่างวด</h3>
-      <input
-        type="number"
-        placeholder="ยอดเงินที่โอน (บาท)"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        required
-        className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm"
-      />
-      <input
-        type="date"
-        value={paymentDate}
-        onChange={(e) => setPaymentDate(e.target.value)}
-        required
-        className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm"
-      />
       <div>
-        <p className="mb-1 text-xs font-semibold text-slate-500">สลิปโอนเงิน (บังคับแนบ)</p>
+        <label className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+          <Banknote className="h-4 w-4 shrink-0" aria-hidden />
+          ยอดเงินที่โอน (บาท)
+        </label>
+        <input
+          type="number"
+          placeholder="เช่น 1000"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          required
+          className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base"
+        />
+      </div>
+      <div>
+        <label className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+          <CalendarDays className="h-4 w-4 shrink-0" aria-hidden />
+          วันที่โอนเงิน
+        </label>
+        <input
+          type="date"
+          value={paymentDate}
+          onChange={(e) => setPaymentDate(e.target.value)}
+          required
+          className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base"
+        />
+      </div>
+      <div>
+        <p className="mb-1 text-sm font-semibold text-slate-700">สลิปโอนเงิน (บังคับแนบ)</p>
         <EvidenceUploadButton url={transferSlipUrl} onUploaded={(url) => setTransferSlipUrl(url)} showPreview />
       </div>
-      <textarea
-        placeholder="หมายเหตุ / ข้อความถึงกรรมการ"
-        value={householdNote}
-        onChange={(e) => setHouseholdNote(e.target.value)}
-        rows={2}
-        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-      />
+      <div>
+        <label className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+          <MessageSquare className="h-4 w-4 shrink-0" aria-hidden />
+          หมายเหตุถึงกรรมการ (ถ้ามี)
+        </label>
+        <textarea
+          placeholder="เช่น โอนช่วงเย็น ขออภัยหากล่าช้า"
+          value={householdNote}
+          onChange={(e) => setHouseholdNote(e.target.value)}
+          rows={2}
+          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-base"
+        />
+      </div>
       {error && <p className="text-sm font-medium text-rose-600">{error}</p>}
       {success && (
         <p className="text-sm font-medium text-emerald-700">
@@ -86,8 +105,9 @@ export function ReportPaymentForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="min-h-11 rounded-lg bg-amber-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+        className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
       >
+        <Send className="h-4 w-4 shrink-0" aria-hidden />
         {submitting ? "กำลังส่ง..." : "แจ้งชำระเงิน"}
       </button>
     </form>

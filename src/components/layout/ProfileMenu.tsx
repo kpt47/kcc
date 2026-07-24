@@ -48,7 +48,7 @@ export function ProfileMenu({ displayName }: { displayName: string }) {
             onClick={() => setOpen(false)}
             className="block min-h-11 px-4 py-2.5 text-sm font-medium leading-6 text-slate-700 hover:bg-slate-50"
           >
-            เปลี่ยนรหัสผ่าน
+            การตั้งค่าผู้ใช้งาน
           </Link>
           <div className="border-t border-slate-100 px-3 py-2">
             <LogoutButton />

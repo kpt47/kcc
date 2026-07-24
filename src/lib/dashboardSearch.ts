@@ -9,7 +9,7 @@
 import { prisma } from "./prisma";
 import type { CurrentUser } from "./auth";
 import { getAllowedVillageIds, type VillageScope, scopeWhereDirect } from "./scope";
-import { canViewBankLedger } from "./authz";
+import { canViewBankLedger, canViewVillageStatusBook } from "./authz";
 
 const MAX_RESULTS_PER_TYPE = 5;
 const MIN_QUERY_LENGTH = 2;
@@ -20,6 +20,15 @@ export type VillageSearchResult = {
   label: string;
   greenBookTotal: number | null; // null = ผู้ค้นหาไม่มีสิทธิ์ดูเล่มเขียว (ไม่แสดงยอด ไม่ใช่ซ่อนทั้งการ์ด)
   yellowBookOutstanding: number;
+  canSeeVillageStatus: boolean; // ใช้ตัดสินใจแสดง QuickLink "ดูเล่มน้ำตาล" หรือไม่ (canViewVillageStatusBook)
+};
+
+export type BankAccountSearchResult = {
+  type: "bankAccount";
+  id: number;
+  label: string; // ชื่อธนาคาร + เลขที่บัญชี
+  villageLabel: string;
+  latestBalance: number;
 };
 
 export type HouseholdLoanRow = {
@@ -59,7 +68,8 @@ export type DashboardSearchResult =
   | VillageSearchResult
   | HouseholdSearchResult
   | BudgetYearSearchResult
-  | MeetingSearchResult;
+  | MeetingSearchResult
+  | BankAccountSearchResult;
 
 export async function searchDashboard(user: CurrentUser, rawQuery: string): Promise<DashboardSearchResult[]> {
   const q = rawQuery.trim();
@@ -71,15 +81,17 @@ export async function searchDashboard(user: CurrentUser, rawQuery: string): Prom
 
   const scope = await getAllowedVillageIds(user);
   const canSeeBank = canViewBankLedger(user);
+  const canSeeVillageStatus = canViewVillageStatusBook(user);
 
-  const [villages, households, budgetYear, meetings] = await Promise.all([
-    searchVillages(scope, q, canSeeBank),
+  const [villages, households, budgetYear, meetings, bankAccounts] = await Promise.all([
+    searchVillages(scope, q, canSeeBank, canSeeVillageStatus),
     searchHouseholds(scope, q),
     searchBudgetYear(scope, q),
     searchMeetings(scope, q),
+    canSeeBank ? searchBankAccounts(scope, q) : Promise.resolve([]),
   ]);
 
-  return [...villages, ...households, ...(budgetYear ? [budgetYear] : []), ...meetings];
+  return [...villages, ...households, ...(budgetYear ? [budgetYear] : []), ...meetings, ...bankAccounts];
 }
 
 // ครัวเรือน (HOUSEHOLD): ค้นหาได้เฉพาะข้อมูลของตนเอง (เล่มม่วง+เล่มเหลือง) เท่านั้น — ไม่ค้นครัวเรือนอื่น
@@ -132,7 +144,12 @@ function toLoanRow(l: {
 }
 
 // รูปแบบ A: ชื่อ/เลขหมู่หมู่บ้านตรงกัน -> การ์ดสรุปยอดเงิน (เล่มเขียว + เล่มเหลือง) ของหมู่บ้านนั้น
-async function searchVillages(scope: VillageScope, q: string, canSeeBank: boolean): Promise<VillageSearchResult[]> {
+async function searchVillages(
+  scope: VillageScope,
+  q: string,
+  canSeeBank: boolean,
+  canSeeVillageStatus: boolean
+): Promise<VillageSearchResult[]> {
   const villages = await prisma.village.findMany({
     where: {
       ...scopeWhereDirect(scope, "id"),
@@ -163,9 +180,39 @@ async function searchVillages(scope: VillageScope, q: string, canSeeBank: boolea
         label: `หมู่ ${v.villageNo} บ้าน${v.villageName}`,
         greenBookTotal: bankAccounts ? bankAccounts.reduce((sum, acc) => sum + (acc.transactions[0]?.balance ?? 0), 0) : null,
         yellowBookOutstanding: loanAgg._sum.outstandingBalance ?? 0,
+        canSeeVillageStatus,
       };
     })
   );
+}
+
+// รูปแบบ E: เลขที่บัญชี/ชื่อธนาคาร/สาขาตรงกัน -> การ์ดยอดคงเหลือล่าสุดของบัญชีนั้น (เฉพาะผู้มีสิทธิ์ดูเล่มเขียว
+// เท่านั้น — searchDashboard() ข้ามการเรียกฟังก์ชันนี้ไปเลยถ้า !canViewBankLedger ไม่ใช่แค่ซ่อนตัวเลข)
+async function searchBankAccounts(scope: VillageScope, q: string): Promise<BankAccountSearchResult[]> {
+  const accounts = await prisma.bankAccount.findMany({
+    where: {
+      ...scopeWhereDirect(scope, "villageId"),
+      OR: [
+        { bankName: { contains: q } },
+        { branch: { contains: q } },
+        { accountNo: { contains: q } },
+        { accountName: { contains: q } },
+      ],
+    },
+    include: {
+      village: { select: { villageNo: true, villageName: true } },
+      transactions: { orderBy: [{ transactionDate: "desc" }, { id: "desc" }], take: 1 },
+    },
+    take: MAX_RESULTS_PER_TYPE,
+  });
+
+  return accounts.map((a) => ({
+    type: "bankAccount" as const,
+    id: a.id,
+    label: `${a.bankName ?? "ไม่ระบุธนาคาร"}${a.accountNo ? ` เลขที่บัญชี ${a.accountNo}` : ""}`,
+    villageLabel: `หมู่ ${a.village.villageNo} บ้าน${a.village.villageName}`,
+    latestBalance: a.transactions[0]?.balance ?? 0,
+  }));
 }
 
 // รูปแบบ B: ชื่อครัวเรือนเป้าหมายตรงกัน -> ตารางขนาดเล็กแจกแจงประวัติการกู้ยืม

@@ -3,14 +3,18 @@ import { Suspense } from "react";
 import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
 import { LoansPageTabs } from "@/components/workflow/LoansPageTabs";
 import { LoanRiskFilterList } from "@/components/workflow/LoanRiskFilterList";
+import { SmartOmnibar } from "@/components/dashboard/SmartOmnibar";
+import { DebtConfirmationAdminCard, type HouseholdConfirmationStatus } from "@/components/workflow/DebtConfirmationAdminCard";
 import { prisma } from "@/lib/prisma";
 import { THEMES } from "@/lib/theme";
 import { requireUser } from "@/lib/auth";
+import { ceYearToBe } from "@/lib/thai";
 import {
   canCreateOrUpdateLoan,
   canCreateRepayment,
   canEditOrDeleteRepayment,
   canResetCreditStatus,
+  canSetDebtConfirmationDate,
   isItSupportBlockedFromProgramData,
   IT_SUPPORT_DENIED_MESSAGE,
 } from "@/lib/authz";
@@ -61,6 +65,7 @@ export default async function LoansPage() {
   const showRepaymentAction = canCreateRepayment(user);
   const showEditDeleteRepayment = canEditOrDeleteRepayment(user);
   const showResetCredit = canResetCreditStatus(user);
+  const showDebtConfirmationAdmin = canSetDebtConfirmationDate(user) && user.scopeVillageId != null;
 
   // ค้นหาชื่อประธาน/กรรมการการเงินของแต่ละหมู่บ้านล่วงหน้าครั้งเดียว (ไม่ query ซ้ำต่อแถว) สำหรับพิมพ์ในใบเสร็จ
   const distinctVillageIds = [...new Set(loans.map((loan) => loan.household.village.id))];
@@ -69,6 +74,43 @@ export default async function LoansPage() {
       distinctVillageIds.map(async (villageId) => [villageId, await findVillageOfficials(villageId)] as const)
     )
   );
+
+  // ประธานกรรมการ (CHAIRMAN) เท่านั้น: ข้อมูลรอบยืนยันยอดหนี้ประจำปีล่าสุดของหมู่บ้านตนเอง + สถานะของแต่ละครัวเรือน
+  let debtConfirmationSection: React.ReactNode = null;
+  if (showDebtConfirmationAdmin && user.scopeVillageId) {
+    const [latestRound, villageHouseholds] = await Promise.all([
+      prisma.debtConfirmationRound.findFirst({
+        where: { villageId: user.scopeVillageId },
+        orderBy: { year: "desc" },
+        include: { confirmations: true },
+      }),
+      prisma.targetHousehold.findMany({
+        where: { villageId: user.scopeVillageId },
+        select: { id: true, headFirstName: true, headLastName: true },
+        orderBy: { sequenceNo: "asc" },
+      }),
+    ]);
+
+    const confirmationByHouseholdId = new Map(latestRound?.confirmations.map((c) => [c.householdId, c]) ?? []);
+    const householdStatuses: HouseholdConfirmationStatus[] = villageHouseholds.map((h) => {
+      const confirmation = confirmationByHouseholdId.get(h.id);
+      return {
+        householdId: h.id,
+        name: `${h.headFirstName} ${h.headLastName}`,
+        status: !confirmation ? "pending" : confirmation.agreesWithBalance ? "confirmed" : "disputed",
+        confirmedAt: confirmation?.confirmedAt.toISOString() ?? null,
+        note: confirmation?.note ?? null,
+      };
+    });
+
+    debtConfirmationSection = (
+      <DebtConfirmationAdminCard
+        currentYear={latestRound?.year ?? ceYearToBe(new Date().getFullYear())}
+        currentDate={latestRound?.confirmationDate.toISOString().slice(0, 10) ?? null}
+        households={householdStatuses}
+      />
+    );
+  }
 
   const overview = (
     <>
@@ -85,6 +127,8 @@ export default async function LoansPage() {
           </Link>
         )}
       </div>
+
+      <SmartOmnibar />
 
       {loans.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
@@ -137,6 +181,7 @@ export default async function LoansPage() {
   if (!showRepaymentAction) {
     return (
       <PageContainer title="บัญชีคุมลูกหนี้" subtitle="ยอดเงินยืมคงเหลือและประวัติการคืนเงินของครัวเรือนเป้าหมาย">
+        {debtConfirmationSection}
         {overview}
       </PageContainer>
     );
@@ -165,6 +210,7 @@ export default async function LoansPage() {
 
   return (
     <PageContainer title="บัญชีคุมลูกหนี้" subtitle="ยอดเงินยืมคงเหลือและประวัติการคืนเงินของครัวเรือนเป้าหมาย">
+      {debtConfirmationSection}
       <Suspense>
         <LoansPageTabs overview={overview} pendingPayments={pendingPayments} />
       </Suspense>

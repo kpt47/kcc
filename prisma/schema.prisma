@@ -105,6 +105,8 @@ model User {
   phoneNumber   String // บังคับกรอกทุก role — ใช้สำหรับส่ง SMS แจ้งเตือน และฟังก์ชัน Click-to-Call
   email         String @unique // บังคับกรอกทุก role — ใช้สำหรับกู้คืนรหัสผ่านด้วย OTP ทางอีเมล
   lineId        String? // LINE userId ของผู้ใช้ — ใช้สำหรับส่งข้อความแจ้งเตือนผ่าน LINE Messaging API (เดิมชื่อ "LINE แจ้งเตือน")
+  telegramChatId    String? // Telegram chat_id ของผู้ใช้ — ใช้สำหรับส่งข้อความแจ้งเตือนผ่าน Telegram Bot API
+  telegramLinkToken String? @unique // โทเค็นชั่วคราวสำหรับผูกบัญชี Telegram ผ่านลิงก์ t.me/<bot>?start=<token> (เคลียร์ทิ้งหลังผูกสำเร็จ)
   isActive      Boolean  @default(true) // false = ถูกระงับการใช้งาน (soft delete) — ห้าม login อีก
 
   // ข้อมูลส่วนบุคคล (Profile Separation): User เก็บเฉพาะข้อมูลระบบ/การติดต่อ/พื้นที่เท่านั้น
@@ -140,6 +142,10 @@ model User {
   uploadedMeetingRecords       VillageMeetingRecord[]
   passwordResetOtps            PasswordResetOtp[]
   auditLogs                    SystemAuditLog[]
+  pdpaConsents                 PdpaConsent[]
+  createdDebtConfirmationRounds DebtConfirmationRound[]
+  debtConfirmationsMade         DebtConfirmation[]
+  recordedVisitLogs             VisitLog[]
 }
 
 /// ข้อมูลส่วนบุคคลของผู้ใช้ role HOUSEHOLD (1-to-1 กับ User, สร้างเมื่อมีการเปิดบัญชีให้ครัวเรือน)
@@ -154,6 +160,7 @@ model HouseholdProfile {
   occupation        String? // อาชีพปัจจุบัน
   consentPersonName String? // ชื่อผู้ให้ความยินยอม (อ้างอิงสัญญายืมเงิน)
   consentRelation   String? // ความสัมพันธ์กับผู้ให้ความยินยอม เช่น ภรรยา/สามี/ทายาท
+  reminderLeadDays  Int      @default(7) // จำนวนวันล่วงหน้าก่อนครบกำหนดชำระที่ต้องการรับแจ้งเตือน (ตั้งเองได้ที่หน้า "บัญชีของฉัน")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -242,6 +249,7 @@ model Village {
   scopeUsers        User[]
   assignments       VillageAssignment[]
   meetingRecords    VillageMeetingRecord[]
+  debtConfirmationRounds DebtConfirmationRound[]
 
   @@unique([villageNo, subDistrictId])
 }
@@ -267,6 +275,7 @@ model TargetHousehold {
   proposals     ProjectProposal[]
   loanRequests  LoanRequest[]
   users         User[] // บัญชีผู้ใช้ role HOUSEHOLD ที่ผูกกับครัวเรือนนี้ (สำหรับ data isolation)
+  debtConfirmations DebtConfirmation[]
 
   @@unique([villageId, sequenceNo])
 }
@@ -305,15 +314,34 @@ model DevelopmentWorkerAssignment {
   endDate   DateTime? // วันเดือนปี สิ้นสุดรับผิดชอบ
 }
 
-/// บันทึกการติดตาม ตรวจสอบ และให้ข้อแนะนำของเจ้าหน้าที่ (เล่มม่วง ท้ายเล่ม)
+/// บันทึกการติดตาม ตรวจสอบ และให้ข้อแนะนำของเจ้าหน้าที่ (เล่มม่วง ท้ายเล่ม) — ใช้เป็นหลักฐานการลงพื้นที่ปฏิบัติงาน
+/// ของพัฒนากรตำบล (เช่น ร่วมประชุม ติดตามหนี้สิน) พร้อมแนบเอกสาร/ภาพถ่ายประกอบได้หลายไฟล์ต่อรายการ
+/// สร้าง/ลบได้เฉพาะพัฒนากรตำบล (SUB_DISTRICT_ADMIN) เจ้าของบันทึกเท่านั้น — ดูได้ทุก role ตั้งแต่ระดับตำบลขึ้นไป
+/// ตามเขตพื้นที่ (ดู lib/authz.ts: canCreateVisitLog/canViewVisitLogBook)
 model VisitLog {
   id           Int      @id @default(autoincrement())
   villageId    Int
   village      Village  @relation(fields: [villageId], references: [id])
   visitDate    DateTime // วันเดือนปีที่ติดตาม
+  visitType    String // ประเภทการลงพื้นที่ เช่น "ร่วมประชุม", "ติดตามหนี้สิน", "ตรวจเยี่ยมครัวเรือน", "อื่นๆ"
   visitorName  String // ชื่อ/สกุลผู้ติดตาม
   visitorTitle String? // ตำแหน่งผู้ติดตาม
   notes        String? // ประเด็นที่ติดตามและข้อสังเกตแนะนำ
+  recordedById Int
+  recordedBy   User     @relation(fields: [recordedById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  attachments VisitLogAttachment[]
+}
+
+/// เอกสาร/ภาพถ่ายแนบประกอบบันทึกการติดตามแต่ละรายการ (แนบได้หลายไฟล์ต่อ 1 บันทึก)
+model VisitLogAttachment {
+  id         Int      @id @default(autoincrement())
+  visitLogId Int
+  visitLog   VisitLog @relation(fields: [visitLogId], references: [id], onDelete: Cascade)
+  fileUrl    String
+  createdAt  DateTime @default(now())
 }
 
 // ============================================================
@@ -602,6 +630,41 @@ model VillageMeetingRecord {
   updatedAt    DateTime @updatedAt
 }
 
+/// รอบยืนยันยอดหนี้ประจำปี — ประธานคณะกรรมการ (CHAIRMAN) กำหนดวันเริ่มยืนยันยอดของหมู่บ้านตนเองในแต่ละปี
+/// (ปี พ.ศ.) ครัวเรือนยืนยันยอดหนี้รวมของตนได้ตั้งแต่วันที่กำหนดเป็นต้นไป จนกว่าจะมีการสร้างรอบของปีถัดไป
+model DebtConfirmationRound {
+  id               Int      @id @default(autoincrement())
+  villageId        Int
+  village          Village  @relation(fields: [villageId], references: [id])
+  year             Int // ปี พ.ศ. ที่ยืนยันยอด
+  confirmationDate DateTime // วันที่ประธานกรรมการกำหนดให้เริ่มยืนยันยอดของปีนี้
+  createdById      Int
+  createdBy        User     @relation(fields: [createdById], references: [id])
+  createdAt        DateTime @default(now())
+
+  confirmations DebtConfirmation[]
+
+  @@unique([villageId, year])
+}
+
+/// การยืนยันยอดหนี้รวมของครัวเรือนหนึ่งๆ ต่อรอบยืนยันยอดหนึ่งๆ (ยืนยันยอดคงเหลือรวมทุกเงินยืมที่ยังไม่ปิดสัญญา
+/// ในครั้งเดียว ไม่แยกยืนยันทีละเงินยืม) — เก็บสำเนายอด ณ ขณะยืนยันไว้เป็นหลักฐาน แม้ยอดจริงจะเปลี่ยนภายหลัง
+model DebtConfirmation {
+  id                Int                   @id @default(autoincrement())
+  roundId           Int
+  round             DebtConfirmationRound @relation(fields: [roundId], references: [id])
+  householdId       Int
+  household         TargetHousehold       @relation(fields: [householdId], references: [id])
+  confirmedById     Int
+  confirmedBy       User                  @relation(fields: [confirmedById], references: [id])
+  outstandingTotal  Float // ยอดหนี้คงเหลือรวมทุกเงินยืม ณ ขณะยืนยัน
+  agreesWithBalance Boolean // true = ยืนยันว่ายอดถูกต้อง, false = แจ้งว่ายอดไม่ตรง (มีข้อโต้แย้ง)
+  note              String? // หมายเหตุ/รายละเอียดข้อโต้แย้ง (กรอกเมื่อ agreesWithBalance = false)
+  confirmedAt       DateTime @default(now())
+
+  @@unique([roundId, householdId])
+}
+
 /// รหัส OTP ชั่วคราวสำหรับกู้คืนรหัสผ่านทางอีเมล (Self-Service Password Reset) — หมดอายุใน 5 นาทีตามที่กำหนด
 /// เก็บเฉพาะค่า hash ของ OTP (ไม่เก็บรหัส 6 หลักตัวจริง) เช่นเดียวกับการเก็บรหัสผ่าน — ดู lib/otp.ts
 model PasswordResetOtp {
@@ -625,4 +688,18 @@ model SystemAuditLog {
   detail    String?
   ipAddress String?
   createdAt DateTime @default(now())
+}
+
+/// หลักฐานการให้ความยินยอมตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA) ของผู้ใช้แต่ละคน
+/// เก็บเป็นประวัติ (ไม่ overwrite) — ถ้าแก้ไขข้อความนโยบายในอนาคตแล้วขึ้น policyVersion ใหม่ ผู้ใช้ต้องกดยินยอมซ้ำ
+/// (ดู src/lib/pdpa.ts: PDPA_POLICY_VERSION) การบล็อกการใช้งานจนกว่าจะยินยอม ทำที่ src/app/layout.tsx
+model PdpaConsent {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policyVersion String // เวอร์ชันข้อความนโยบายที่ยินยอม ณ ขณะนั้น เช่น "1.0"
+  acceptedAt    DateTime @default(now())
+  ipAddress     String?
+
+  @@index([userId, policyVersion])
 }

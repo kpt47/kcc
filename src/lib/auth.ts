@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma";
+import { DEFAULT_REMINDER_LEAD_DAYS } from "./reminderSettings";
 import type { GlobalRole, CommitteeRole } from "@/generated/prisma/client";
 
 export const SESSION_COOKIE = "kkc_session";
@@ -162,6 +163,7 @@ export async function getHouseholdProfileView(user: Pick<CurrentUser, "household
     incomeAfter3Yr: incomeAfter(3),
     age: profile?.age ?? null,
     occupation: profile?.occupation ?? null,
+    reminderLeadDays: profile?.reminderLeadDays ?? DEFAULT_REMINDER_LEAD_DAYS,
     consentPersonName: profile?.consentPersonName ?? null,
     consentRelation: profile?.consentRelation ?? null,
   };

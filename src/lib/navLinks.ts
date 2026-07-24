@@ -15,12 +15,61 @@ import {
   UserCog,
   Settings,
   ShieldCheck,
+  Info,
+  Lightbulb,
+  NotebookPen,
+  Map,
+  BookOpen,
+  FolderOpen,
+  Search,
+  Shield,
 } from "lucide-react";
 import { menusForRole } from "./dashboard";
 import { hasMinRole } from "./authz";
 import type { CurrentUser } from "./auth";
 
-export type NavLink = { href: string; label: string; icon: LucideIcon; iconColor?: string };
+export type NavLink = { href: string; label: string; icon: LucideIcon; iconColor?: string; group?: string };
+
+// ป้ายหัวข้อคั่นกลุ่มเมนู (แสดงเฉพาะเมื่อมีมากกว่า 1 กลุ่มปรากฏอยู่จริงในรายการ — ดู withSectionHeaders)
+export const NAV_GROUP_LABELS: Record<string, string> = {
+  books: "สมุดบัญชี 4 เล่ม",
+  forms: "แบบฟอร์มและเอกสาร",
+  reports: "รายงานและค้นหา",
+  admin: "ผู้ดูแลระบบ",
+};
+
+export type NavListItem = { type: "link"; link: NavLink } | { type: "header"; label: string; group: string };
+
+// ไอคอน+สีของ "หัวข้อคั่นกลุ่ม" เอง (คนละชุดกับ BOOK_ICON_COLOR ที่เป็นสีของลิงก์ย่อยแต่ละอัน) — เลือกให้ต่างจาก
+// ไอคอน/สีของลิงก์ย่อยในกลุ่มเดียวกัน เพื่อไม่ให้สับสนว่าอันไหนคือหัวข้อคั่น แสดงเป็นแถบพื้นสี (banner) ให้เด่น
+// แยกจากรายการเมนูด้านล่างชัดเจน ไม่ใช่แค่ตัวอักษรสีเฉยๆ
+export const NAV_GROUP_STYLE: Record<string, { icon: LucideIcon; text: string; bg: string }> = {
+  books: { icon: BookOpen, text: "text-blue-700 dark:text-blue-300", bg: "bg-blue-50 dark:bg-blue-950/40" },
+  forms: { icon: FolderOpen, text: "text-cyan-700 dark:text-cyan-300", bg: "bg-cyan-50 dark:bg-cyan-950/40" },
+  reports: { icon: Search, text: "text-rose-700 dark:text-rose-300", bg: "bg-rose-50 dark:bg-rose-950/40" },
+  admin: { icon: Shield, text: "text-indigo-700 dark:text-indigo-300", bg: "bg-indigo-50 dark:bg-indigo-950/40" },
+};
+
+/**
+ * แปลง NavLink[] แบบเรียบให้มีหัวข้อคั่นกลุ่มแทรกอยู่ด้วย — ถ้ามีแค่กลุ่มเดียว (หรือไม่มีกลุ่มเลย เช่น
+ * เมนู HOUSEHOLD/IT_SUPPORT ที่สั้นอยู่แล้ว) จะไม่แสดงหัวข้อใดๆ เลย เพื่อไม่ให้เพิ่มความรกโดยไม่จำเป็น
+ * ใช้ร่วมกันทั้ง Sidebar.tsx (เดสก์ท็อป) และ TopNav.tsx (เมนู Hamburger มือถือ)
+ */
+export function withSectionHeaders(links: NavLink[]): NavListItem[] {
+  const distinctGroups = new Set(links.map((l) => l.group).filter(Boolean));
+  if (distinctGroups.size <= 1) return links.map((link) => ({ type: "link", link }));
+
+  const result: NavListItem[] = [];
+  let lastGroup: string | undefined;
+  for (const link of links) {
+    if (link.group && link.group !== lastGroup) {
+      result.push({ type: "header", label: NAV_GROUP_LABELS[link.group] ?? link.group, group: link.group });
+    }
+    lastGroup = link.group;
+    result.push({ type: "link", link });
+  }
+  return result;
+}
 
 // สีไอคอนอ้างอิงสีปกสมุดบัญชีแต่ละเล่ม (ตรงกับ lib/theme.ts) — ใช้ text-* เพราะ Sidebar/BottomNav
 // วาดไอคอนแบบ outline (currentColor) ไม่ใช่พื้นหลังทึบแบบ badge ใน MenuCard
@@ -68,38 +117,66 @@ export function getNavLinks(user: CurrentUser): NavLink[] {
     return [
       { href: "/", label: "หน้าหลัก", icon: Home },
       {
-        href: "/#household-profile",
+        href: "/household-profile",
         label: "ข้อมูลครัวเรือนของฉัน (เล่มม่วง)",
         icon: Users,
         iconColor: BOOK_ICON_COLOR.households,
       },
       {
-        href: "/#debt-history",
+        href: "/debt-history",
         label: "ประวัติหนี้สินของฉัน (เล่มเหลือง)",
         icon: Banknote,
         iconColor: BOOK_ICON_COLOR.loans,
+      },
+      {
+        href: "/career-ideas",
+        label: "แนะนำอาชีพ!",
+        icon: Lightbulb,
+        iconColor: "text-amber-600 dark:text-amber-300",
+      },
+      {
+        href: "/funding-sources",
+        label: "แหล่งทุนใกล้ฉัน",
+        icon: MapPin,
+        iconColor: "text-sky-600 dark:text-sky-300",
       },
     ];
   }
 
   return [
     { href: "/", label: "หน้าหลัก", icon: Home },
-    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/overview-report", label: "Dashboard", icon: Map },
+    { href: "/dashboard", label: "สรุปรายงาน", icon: LayoutDashboard },
     ...menusForRole(user).map((m) => ({
       href: m.href,
       label: m.title,
       icon: BOOK_ICONS[m.key] ?? FileText,
       iconColor: BOOK_ICON_COLOR[m.key],
+      group: "books",
     })),
-    ...EXTRA_LINKS,
-    { href: "/reports/smart", label: "ค้นหา/แผนที่ (Smart Report)", icon: MapPin },
-    { href: "/official-reports", label: "แบบรายงานภาวะหนี้สินฯ", icon: BarChart3 },
-    ...(hasMinRole(user, "DISTRICT_ADMIN") ? [{ href: "/reports", label: "รายงานราชการ", icon: BarChart3 }] : []),
-    ...(isUserManager ? [{ href: "/users", label: "จัดการผู้ใช้งาน", icon: UserCog }] : []),
-    ...(hasMinRole(user, "GLOBAL_ADMIN")
-      ? [{ href: "/master-data", label: "จัดการพื้นที่ (Master Data)", icon: Settings }]
+    ...EXTRA_LINKS.map((l) => ({ ...l, group: "forms" })),
+    // เฉพาะพัฒนากรตำบล/ผู้บริหารอำเภอ/ผู้บริหารจังหวัด — ต้องตรงกับ lib/authz.ts: canViewVillageStatusBook เป๊ะ
+    ...(role === "SUB_DISTRICT_ADMIN" || role === "DISTRICT_ADMIN" || role === "PROVINCIAL_ADMIN"
+      ? [
+          {
+            href: "/visit-logs",
+            label: "บันทึกการติดตามและข้อแนะนำ",
+            icon: NotebookPen,
+            iconColor: "text-sky-600 dark:text-sky-300",
+            group: "forms",
+          },
+        ]
       : []),
-    ...(role === "GLOBAL_ADMIN" ? [{ href: "/admin/audit-logs", label: "Audit Logs", icon: ShieldCheck }] : []),
+    { href: "/reports/smart", label: "วิเคราะห์ข้อมูล", icon: MapPin, group: "reports" },
+    { href: "/official-reports", label: "แบบรายงานภาวะหนี้สินฯ", icon: BarChart3, group: "reports" },
+    ...(isUserManager ? [{ href: "/users", label: "จัดการผู้ใช้งาน", icon: UserCog, group: "admin" }] : []),
+    ...(hasMinRole(user, "GLOBAL_ADMIN")
+      ? [{ href: "/master-data", label: "จัดการพื้นที่ (หมู่บ้าน)", icon: Settings, group: "admin" }]
+      : []),
+    ...(role === "GLOBAL_ADMIN"
+      ? [{ href: "/admin/audit-logs", label: "Audit Logs", icon: ShieldCheck, group: "admin" }]
+      : []),
+    { href: "/about-program", label: "เกี่ยวกับโปรแกรม", icon: Info, group: "admin" },
   ];
 }
 

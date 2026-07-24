@@ -4,6 +4,7 @@ import { proposalWorkerOpinionSchema } from "@/lib/schemas";
 import { getCurrentUser } from "@/lib/auth";
 import { getAllowedVillageIds, canAccessHouseholdRecord } from "@/lib/scope";
 import { ACCESS_DENIED_MESSAGE, canGiveWorkerOpinion } from "@/lib/authz";
+import { hasVillageMeetingRecord, MEETING_RECORD_REQUIRED_MESSAGE } from "@/lib/meetings";
 
 // แบบฟอร์ม 1 (แบบเสนอโครงการ): พัฒนากรบันทึก "ความเห็นของพัฒนากร" — เฉพาะ SUB_DISTRICT_ADMIN เท่านั้น
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -26,6 +27,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const scope = await getAllowedVillageIds(user);
   if (!canAccessHouseholdRecord(user, scope, proposal.household)) {
     return NextResponse.json({ error: { formErrors: ["ไม่พบแบบเสนอโครงการที่ระบุ"] } }, { status: 404 });
+  }
+
+  if (!(await hasVillageMeetingRecord(proposal.household.villageId))) {
+    return NextResponse.json({ error: { formErrors: [MEETING_RECORD_REQUIRED_MESSAGE] } }, { status: 409 });
   }
 
   const body = await request.json();

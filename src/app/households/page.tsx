@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
 import { HouseholdSearchBar } from "@/components/households/HouseholdSearchBar";
+import { SmartOmnibar } from "@/components/dashboard/SmartOmnibar";
 import { ImportHouseholdsModal } from "@/components/households/ImportHouseholdsModal";
+import { EntityListView, type EntityColumnDef, type EntityRow } from "@/components/shared/EntityListView";
+import { StarRating } from "@/components/shared/StarRating";
+import { getHouseholdStarRating } from "@/lib/rating";
 import { prisma } from "@/lib/prisma";
 import { THEMES } from "@/lib/theme";
 import { requireUser } from "@/lib/auth";
@@ -34,6 +38,7 @@ export default async function HouseholdsPage() {
     include: {
       village: { select: { id: true, villageName: true, villageNo: true } },
       _count: { select: { proposals: true, loanRequests: true } },
+      loans: { select: { isClosed: true, riskStatus: true } },
     },
   });
 
@@ -66,6 +71,8 @@ export default async function HouseholdsPage() {
         </div>
       </div>
 
+      <SmartOmnibar />
+
       <HouseholdSearchBar />
 
       {households.length === 0 ? (
@@ -74,30 +81,65 @@ export default async function HouseholdsPage() {
         </p>
       ) : (
         <div className="flex flex-col gap-6">
-          {[...villageGroups.values()].map(({ village, households: groupHouseholds }) => (
-            <div key={village.id} className="flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-slate-700">
-                  หมู่ {village.villageNo} บ้าน{village.villageName}
-                </p>
-                <a
-                  href={`/api/villages/${village.id}/register-pdf`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex min-h-11 items-center rounded-full border border-slate-300 px-3.5 text-xs font-semibold text-slate-600 transition hover:border-violet-400 hover:text-violet-700"
-                >
-                  พิมพ์ทะเบียน (PDF)
-                </a>
-              </div>
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              {groupHouseholds.map((h) => (
-                <div key={h.id} className={`rounded-2xl border ${theme.cardBorder} ${theme.cardBg} p-4`}>
+          {[...villageGroups.values()].map(({ village, households: groupHouseholds }) => {
+            const columns: EntityColumnDef[] = [
+              { key: "sequenceNo", label: "ลำดับที่", align: "center" },
+              { key: "name", label: "ชื่อ-สกุล" },
+              { key: "houseNo", label: "บ้านเลขที่" },
+              { key: "isDefaulted", label: "สถานะ", align: "center" },
+              { key: "contractStars", label: "สถานะสัญญา", align: "center" },
+              { key: "incomeBeforeLoan", label: "รายได้ก่อนยืม", align: "right" },
+              { key: "proposals", label: "แบบเสนอโครงการ", align: "center" },
+              { key: "loanRequests", label: "แบบขอยืมเงินทุน", align: "center" },
+            ];
+
+            const listRows: EntityRow[] = groupHouseholds.map((h) => {
+              const rating = getHouseholdStarRating(h);
+              return {
+              key: h.id,
+              sortValues: {
+                sequenceNo: h.sequenceNo,
+                name: `${h.headFirstName} ${h.headLastName}`,
+                houseNo: h.houseNo ?? "",
+                isDefaulted: h.isDefaulted ? 1 : 0,
+                contractStars: rating?.stars ?? -1,
+                incomeBeforeLoan: h.incomeBeforeLoan ?? -1,
+                proposals: h._count.proposals,
+                loanRequests: h._count.loanRequests,
+              },
+              cells: {
+                sequenceNo: h.sequenceNo,
+                name: `${h.headFirstName} ${h.headLastName}`,
+                houseNo: h.houseNo ?? "-",
+                isDefaulted: h.isDefaulted ? (
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">ผิดสัญญา</span>
+                ) : (
+                  <span className="text-xs text-slate-400">ปกติ</span>
+                ),
+                contractStars: rating ? (
+                  <StarRating rating={rating.stars} size={16} label={rating.label} />
+                ) : (
+                  <span className="text-xs text-slate-400">ยังไม่มีสัญญา</span>
+                ),
+                incomeBeforeLoan: h.incomeBeforeLoan != null ? `${h.incomeBeforeLoan.toLocaleString("th-TH")} บาท` : "-",
+                proposals: h._count.proposals,
+                loanRequests: h._count.loanRequests,
+              },
+              card: (
+                <div className={`rounded-2xl border ${theme.cardBorder} ${theme.cardBg} p-4`}>
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className={`text-base font-bold ${theme.headingText}`}>
                         ลำดับที่ {h.sequenceNo} - {h.headFirstName} {h.headLastName}
                       </p>
-                      <p className="text-sm text-slate-600">
+                      <div className="mt-1">
+                        {rating ? (
+                          <StarRating rating={rating.stars} label={rating.label} />
+                        ) : (
+                          <span className="text-xs text-slate-400">ยังไม่มีสัญญา</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-slate-600">
                         หมู่ {h.village.villageNo} บ้าน{h.village.villageName}
                         {h.houseNo ? ` เลขที่ ${h.houseNo}` : ""}
                       </p>
@@ -116,10 +158,30 @@ export default async function HouseholdsPage() {
                     <span>แบบขอยืมเงินทุน: {h._count.loanRequests} รายการ</span>
                   </div>
                 </div>
-              ))}
+              ),
+              };
+            });
+
+            return (
+              <div key={village.id} className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-700">
+                    หมู่ {village.villageNo} บ้าน{village.villageName}
+                  </p>
+                  <a
+                    href={`/api/villages/${village.id}/register-pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-11 items-center rounded-full border border-slate-300 px-3.5 text-xs font-semibold text-slate-600 transition hover:border-violet-400 hover:text-violet-700"
+                  >
+                    พิมพ์ทะเบียน (PDF)
+                  </a>
+                </div>
+
+                <EntityListView rows={listRows} columns={columns} defaultSortField="sequenceNo" />
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </PageContainer>

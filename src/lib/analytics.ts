@@ -3,7 +3,7 @@
 // (ไม่ query ตรงจาก page component โดยไม่ผ่าน scope)
 import { prisma } from "./prisma";
 import type { CurrentUser } from "./auth";
-import { type VillageScope, scopeWhereDirect } from "./scope";
+import { type VillageScope, scopeWhereDirect, scopeWhereViaHousehold } from "./scope";
 
 const THAI_MONTHS_SHORT = [
   "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
@@ -24,6 +24,9 @@ export type HouseholdKpis = {
   totalRepaid: number;
   nextDueDate: string | null;
   pieData: { name: string; value: number }[];
+  /** ยอดชำระรวมต่อเดือน ย้อนหลัง 6 เดือน — ใช้แสดง sparkline ใต้ KPI "ยอดหนี้คงเหลือ" คำนวณจาก
+   *  relation `repayments` ที่ query มาอยู่แล้วด้านบน ไม่มี query เพิ่ม */
+  repaymentTrend: number[];
 };
 
 export async function getHouseholdKpis(user: CurrentUser): Promise<HouseholdKpis | null> {
@@ -40,6 +43,20 @@ export async function getHouseholdKpis(user: CurrentUser): Promise<HouseholdKpis
     .filter((l) => l.dueDate)
     .sort((a, b) => a.dueDate!.getTime() - b.dueDate!.getTime())[0]?.dueDate;
 
+  const monthlyMap = new Map<string, number>();
+  for (const loan of loans) {
+    for (const r of loan.repayments) {
+      const key = `${r.paymentDate.getFullYear()}-${r.paymentDate.getMonth()}`;
+      monthlyMap.set(key, (monthlyMap.get(key) ?? 0) + r.amount);
+    }
+  }
+  const now = new Date();
+  const repaymentTrend = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+    const key = `${d.getFullYear()}-${d.getMonth()}`;
+    return monthlyMap.get(key) ?? 0;
+  });
+
   return {
     outstandingBalance,
     totalRepaid,
@@ -48,6 +65,7 @@ export async function getHouseholdKpis(user: CurrentUser): Promise<HouseholdKpis
       { name: "ชำระแล้ว", value: totalRepaid },
       { name: "ค้างชำระ", value: outstandingBalance },
     ],
+    repaymentTrend,
   };
 }
 
@@ -61,6 +79,8 @@ export type VillageDashboardData = {
   cashOnHand: number;
   outstandingWithHouseholds: number;
   totalDebtors: number;
+  requiredFund: number;
+  fundShortfall: number;
   monthlyRepayments: { month: string; amount: number }[];
   overdueLoans: { householdName: string; outstandingBalance: number; dueDate: string; daysOverdue: number }[];
 };
@@ -115,13 +135,18 @@ export async function getVillageDashboardData(villageId: number): Promise<Villag
     }))
     .sort((a, b) => b.daysOverdue - a.daysOverdue);
 
+  const totalFund = bankBalance + cashOnHand + outstandingWithHouseholds;
+  const requiredFund = village.budgetAmount ?? GOVERNMENT_FUND_PRINCIPAL;
+
   return {
     villageName: `หมู่ ${village.villageNo} บ้าน${village.villageName}`,
-    totalFund: bankBalance + cashOnHand + outstandingWithHouseholds,
+    totalFund,
     bankBalance,
     cashOnHand,
     outstandingWithHouseholds,
     totalDebtors,
+    requiredFund,
+    fundShortfall: Math.max(0, requiredFund - totalFund),
     monthlyRepayments,
     overdueLoans,
   };
@@ -256,6 +281,161 @@ export async function getBigPictureDashboardData(scope: VillageScope): Promise<B
 }
 
 // ---------------------------------------------------------------------------
+// NPL (Non-Performing Loan) — สถานะ/แนวโน้ม/Watchlist สำหรับ Dashboard ระดับอำเภอ/จังหวัด/ส่วนกลาง
+// ---------------------------------------------------------------------------
+
+export type NplStatus = {
+  overallNplRatio: number;
+  totalOutstanding: number;
+  totalOverdue: number;
+  normalCount: number;
+  watchlistCount: number;
+  highRiskCount: number;
+};
+
+/** สถานะ NPL ปัจจุบันโดยรวมในขอบเขตของผู้ใช้ — นับจำนวนเงินยืมแยกตาม riskStatus (คำนวณอัตโนมัติจาก src/lib/risk.ts) */
+export async function getNplStatus(scope: VillageScope): Promise<NplStatus> {
+  const loans = await prisma.loan.findMany({
+    where: { isClosed: false, ...scopeWhereViaHousehold(scope) },
+    select: { outstandingBalance: true, riskStatus: true, dueDate: true },
+  });
+  const today = startOfDay(new Date());
+  const totalOutstanding = loans.reduce((s, l) => s + l.outstandingBalance, 0);
+  const totalOverdue = loans
+    .filter((l) => l.dueDate && l.dueDate < today)
+    .reduce((s, l) => s + l.outstandingBalance, 0);
+
+  return {
+    overallNplRatio: totalOutstanding > 0 ? totalOverdue / totalOutstanding : 0,
+    totalOutstanding,
+    totalOverdue,
+    normalCount: loans.filter((l) => l.riskStatus === "NORMAL").length,
+    watchlistCount: loans.filter((l) => l.riskStatus === "WATCHLIST").length,
+    highRiskCount: loans.filter((l) => l.riskStatus === "HIGH_RISK").length,
+  };
+}
+
+export type NplWatchlistLevel = "subDistrict" | "district" | "province";
+
+export type NplWatchlistRow = {
+  areaName: string;
+  nplRatio: number;
+  totalOutstanding: number;
+  overdueAmount: number;
+};
+
+/**
+ * Top 5 พื้นที่ที่มี NPL สูงสุด ณ ระดับที่ระบุ — ใช้กับ Dashboard โดยเลือกระดับตามสิทธิ์ผู้ใช้เอง (ดูหน้า
+ * dashboard/page.tsx): DISTRICT_ADMIN ดูรายตำบล, PROVINCIAL_ADMIN ดูรายอำเภอ, GLOBAL_ADMIN ดูรายจังหวัด
+ */
+export async function getNplWatchlist(scope: VillageScope, level: NplWatchlistLevel): Promise<NplWatchlistRow[]> {
+  const villages = await prisma.village.findMany({
+    where: scopeWhereDirect(scope, "id"),
+    include: { subDistrict: { include: { district: { include: { province: true } } } } },
+  });
+  const villageIds = villages.map((v) => v.id);
+
+  const loans = await prisma.loan.findMany({
+    where: { isClosed: false, household: { villageId: { in: villageIds } } },
+    include: { household: { select: { villageId: true } } },
+  });
+  const today = startOfDay(new Date());
+
+  const perVillage = villages.map((v) => {
+    const vLoans = loans.filter((l) => l.household.villageId === v.id);
+    const totalOutstanding = vLoans.reduce((s, l) => s + l.outstandingBalance, 0);
+    const overdueAmount = vLoans
+      .filter((l) => l.dueDate && l.dueDate < today)
+      .reduce((s, l) => s + l.outstandingBalance, 0);
+    const areaName =
+      level === "subDistrict"
+        ? `ตำบล${v.subDistrict.name}`
+        : level === "district"
+          ? `อำเภอ${v.subDistrict.district.name}`
+          : `จังหวัด${v.subDistrict.district.province.name}`;
+    return { areaName, totalOutstanding, overdueAmount };
+  });
+
+  const grouped = new Map<string, NplWatchlistRow>();
+  for (const row of perVillage) {
+    const existing = grouped.get(row.areaName);
+    if (!existing) {
+      grouped.set(row.areaName, { ...row, nplRatio: 0 });
+      continue;
+    }
+    existing.totalOutstanding += row.totalOutstanding;
+    existing.overdueAmount += row.overdueAmount;
+  }
+
+  return Array.from(grouped.values())
+    .filter((r) => r.totalOutstanding > 0)
+    .map((r) => ({ ...r, nplRatio: r.overdueAmount / r.totalOutstanding }))
+    .sort((a, b) => b.nplRatio - a.nplRatio)
+    .slice(0, 5);
+}
+
+// ---------------------------------------------------------------------------
+// เงินทุนต้นทุนของรัฐบาล (เล่มเขียว + เล่มเหลือง) — ทุกหมู่บ้านต้องมีเงินทุนรวม (เงินฝากธนาคาร +
+// ยอดเงินยืมคงเหลือกับครัวเรือน) ไม่ต่ำกว่างบประมาณที่ได้รับจัดสรรจากรัฐบาลครั้งแรก มิฉะนั้นแปลว่ามีเงินทุน
+// สูญหายไปจากระบบจริง (นอกเหนือจากที่อยู่ระหว่างให้ครัวเรือนยืม) — ใช้เตือนใน Dashboard และปักหมุดเสี่ยงบนแผนที่
+// ---------------------------------------------------------------------------
+
+/** เงินทุนต้นทุนมาตรฐานที่รัฐบาลจัดสรรให้กองทุนหมู่บ้านแต่ละแห่ง — ใช้เป็นค่า fallback เมื่อ Village.budgetAmount ยังไม่ได้ตั้งค่า */
+export const GOVERNMENT_FUND_PRINCIPAL = 280_000;
+
+export type VillageFundRow = {
+  villageId: number;
+  villageName: string;
+  requiredFund: number;
+  currentFund: number;
+  bankBalance: number;
+  outstandingBalance: number;
+  fundShortfall: number;
+  atRisk: boolean;
+};
+
+/**
+ * สถานะเงินทุนต้นทุนรายหมู่บ้านในขอบเขตของผู้ใช้ — currentFund = เงินฝากธนาคารคงเหลือ + ยอดเงินยืมคงเหลือ
+ * (ที่ยังอยู่กับครัวเรือน ยังไม่ปิดสัญญา) เทียบกับ requiredFund (Village.budgetAmount หรือ 280,000 เป็นค่าเริ่มต้น)
+ * เรียงจากขาดมากไปน้อย — ใช้ทั้งที่ Dashboard และหมุดแผนที่ (Smart Report & Map Center)
+ */
+export async function getVillageFundStatusRows(scope: VillageScope): Promise<VillageFundRow[]> {
+  const villages = await prisma.village.findMany({
+    where: scopeWhereDirect(scope, "id"),
+    include: { bankAccounts: { include: { transactions: { orderBy: [{ transactionDate: "desc" }, { id: "desc" }], take: 1 } } } },
+    orderBy: { id: "asc" },
+  });
+  const villageIds = villages.map((v) => v.id);
+
+  const loans = await prisma.loan.findMany({
+    where: { isClosed: false, household: { villageId: { in: villageIds } } },
+    include: { household: { select: { villageId: true } } },
+  });
+
+  const rows = villages.map((v) => {
+    const outstandingBalance = loans
+      .filter((l) => l.household.villageId === v.id)
+      .reduce((s, l) => s + l.outstandingBalance, 0);
+    const bankBalance = v.bankAccounts.reduce((s, a) => s + (a.transactions[0]?.balance ?? 0), 0);
+    const currentFund = outstandingBalance + bankBalance;
+    const requiredFund = v.budgetAmount ?? GOVERNMENT_FUND_PRINCIPAL;
+    const fundShortfall = Math.max(0, requiredFund - currentFund);
+    return {
+      villageId: v.id,
+      villageName: `หมู่ ${v.villageNo} บ้าน${v.villageName}`,
+      requiredFund,
+      currentFund,
+      bankBalance,
+      outstandingBalance,
+      fundShortfall,
+      atRisk: fundShortfall > 0,
+    };
+  });
+
+  return rows.sort((a, b) => b.fundShortfall - a.fundShortfall);
+}
+
+// ---------------------------------------------------------------------------
 // รายงานราชการ (Official Reports) — สำหรับ /reports
 // ---------------------------------------------------------------------------
 export type Report1Row = {
@@ -319,6 +499,252 @@ export async function getReport1Rows(scope: VillageScope, budgetYear?: number): 
       repaidThisYear,
     };
   });
+}
+
+export type AreaLevel = "village" | "subDistrict" | "district" | "province";
+
+export type AreaSummaryRow = {
+  areaName: string;
+  totalHouseholds: number;
+  targetHouseholds: number;
+  householdsWithLoan: number;
+  outstandingBalance: number;
+  bankBalance: number;
+  cashOnHand: number;
+  totalFund: number;
+  repaidThisYear: number;
+};
+
+export type AreaDrillFilters = {
+  provinceId?: number;
+  districtId?: number;
+  subDistrictId?: number;
+  villageId?: number;
+};
+
+/**
+ * ระดับที่จะแสดงผล คำนวณอัตโนมัติจากตัวกรองที่ลึกที่สุดที่เลือกไว้ — ใช้กับ dropdown แบบต่อเนื่อง (cascading):
+ * ยังไม่เลือกอะไร -> แสดงจังหวัด, เลือกจังหวัดแล้ว -> แสดงอำเภอในจังหวัดนั้น, เลือกอำเภอแล้ว -> แสดงตำบลในอำเภอนั้น,
+ * เลือกตำบลแล้ว (หรือเจาะจงหมู่บ้าน) -> แสดงหมู่บ้านในตำบลนั้น
+ */
+function resolveDrillLevel(filters?: AreaDrillFilters): AreaLevel {
+  if (filters?.subDistrictId || filters?.villageId) return "village";
+  if (filters?.districtId) return "subDistrict";
+  if (filters?.provinceId) return "district";
+  return "province";
+}
+
+/**
+ * สรุปภาวะหนี้สินตามระดับพื้นที่ — ระดับที่แสดงคำนวณอัตโนมัติจาก filters (ดู resolveDrillLevel) เพื่อรองรับ
+ * dropdown จังหวัด→อำเภอ→ตำบล→หมู่บ้าน แบบต่อเนื่อง ใช้ตรรกะคำนวณต่อหมู่บ้านชุดเดียวกับ getReport1Rows ทุกประการ
+ * (รวมถึง cashOnHand จาก snapshot ล่าสุด และ totalHouseholds แบบ snapshot-override) แล้วรวมยอด (sum) ตามระดับ
+ */
+export async function getAreaSummaryRows(
+  scope: VillageScope,
+  budgetYear?: number,
+  filters?: AreaDrillFilters
+): Promise<{ level: AreaLevel; rows: AreaSummaryRow[] }> {
+  const level = resolveDrillLevel(filters);
+
+  const villages = await prisma.village.findMany({
+    where: {
+      ...scopeWhereDirect(scope, "id"),
+      ...(budgetYear ? { budgetYear } : {}),
+      ...(filters?.villageId ? { id: filters.villageId } : {}),
+      ...(filters?.subDistrictId ? { subDistrictId: filters.subDistrictId } : {}),
+      ...(!filters?.subDistrictId && filters?.districtId ? { subDistrict: { districtId: filters.districtId } } : {}),
+      ...(!filters?.districtId && filters?.provinceId
+        ? { subDistrict: { district: { provinceId: filters.provinceId } } }
+        : {}),
+    },
+    include: {
+      households: { select: { id: true } },
+      bankAccounts: { include: { transactions: { orderBy: [{ transactionDate: "desc" }, { id: "desc" }], take: 1 } } },
+      subDistrict: { include: { district: { include: { province: true } } } },
+    },
+    orderBy: { id: "asc" },
+  });
+  const villageIds = villages.map((v) => v.id);
+
+  const loans = await prisma.loan.findMany({
+    where: { household: { villageId: { in: villageIds } } },
+    include: { household: { select: { villageId: true } }, repayments: true },
+  });
+  const snapshots = await prisma.villageStatusSnapshot.findMany({
+    where: { villageId: { in: villageIds } },
+    orderBy: { id: "desc" },
+  });
+  const latestSnapshotByVillage = new Map<number, (typeof snapshots)[number]>();
+  for (const s of snapshots) {
+    if (!latestSnapshotByVillage.has(s.villageId)) latestSnapshotByVillage.set(s.villageId, s);
+  }
+  const yearStart = new Date(new Date().getFullYear(), 0, 1);
+
+  const perVillage: AreaSummaryRow[] = villages.map((v) => {
+    const vLoans = loans.filter((l) => l.household.villageId === v.id);
+    const active = vLoans.filter((l) => !l.isClosed);
+    const outstandingBalance = active.reduce((s, l) => s + l.outstandingBalance, 0);
+    const bankBalance = v.bankAccounts.reduce((s, a) => s + (a.transactions[0]?.balance ?? 0), 0);
+    const cashOnHand = latestSnapshotByVillage.get(v.id)?.fundElsewhere ?? 0;
+    const repaidThisYear = vLoans.reduce(
+      (s, l) => s + l.repayments.filter((r) => r.paymentDate >= yearStart).reduce((rs, r) => rs + r.amount, 0),
+      0
+    );
+
+    const areaName =
+      level === "village"
+        ? `หมู่ ${v.villageNo} บ้าน${v.villageName}`
+        : level === "subDistrict"
+          ? `ตำบล${v.subDistrict.name}`
+          : level === "district"
+            ? `อำเภอ${v.subDistrict.district.name}`
+            : `จังหวัด${v.subDistrict.district.province.name}`;
+
+    return {
+      areaName,
+      totalHouseholds: latestSnapshotByVillage.get(v.id)?.totalHouseholds ?? v.households.length,
+      targetHouseholds: v.households.length,
+      householdsWithLoan: new Set(vLoans.map((l) => l.householdId)).size,
+      outstandingBalance,
+      bankBalance,
+      cashOnHand,
+      totalFund: outstandingBalance + bankBalance + cashOnHand,
+      repaidThisYear,
+    };
+  });
+
+  if (level === "village") return { level, rows: perVillage };
+
+  const grouped = new Map<string, AreaSummaryRow>();
+  for (const row of perVillage) {
+    const existing = grouped.get(row.areaName);
+    if (!existing) {
+      grouped.set(row.areaName, { ...row });
+      continue;
+    }
+    existing.totalHouseholds += row.totalHouseholds;
+    existing.targetHouseholds += row.targetHouseholds;
+    existing.householdsWithLoan += row.householdsWithLoan;
+    existing.outstandingBalance += row.outstandingBalance;
+    existing.bankBalance += row.bankBalance;
+    existing.cashOnHand += row.cashOnHand;
+    existing.totalFund += row.totalFund;
+    existing.repaidThisYear += row.repaidThisYear;
+  }
+  return { level, rows: Array.from(grouped.values()) };
+}
+
+export type OverviewRegionRow = {
+  code: string;
+  name: string;
+  totalVillages: number;
+  totalHouseholds: number;
+  outstandingBalance: number;
+  normalCount: number;
+  watchlistCount: number;
+  highRiskCount: number;
+  avgIncomeBeforeLoan: number;
+};
+
+/**
+ * ข้อมูลรายพื้นที่สำหรับแผนที่ระบายสี (รายงานภาพรวม) — ต่อยอดจาก getAreaSummaryRows แต่ group ตาม `code`
+ * (รหัสจังหวัด/อำเภอ/ตำบลตามมาตรฐาน TIS 1099) แทน areaName string เพื่อให้ join กับไฟล์ GeoJSON เขตการปกครอง
+ * ใน public/geo/ ได้โดยตรง — parentCode ใช้กรองเฉพาะลูกของพื้นที่ที่กำลังดูอยู่ (รหัสจังหวัดตอนดูระดับอำเภอ,
+ * รหัสอำเภอตอนดูระดับตำบล) ความเสี่ยงหนี้นับจาก "จำนวนสัญญา" ตามสถานะเครดิตจริง (Loan.riskStatus ซึ่งคำนวณ
+ * จากวันครบกำหนดชำระโดย calculateRiskStatus() ใน src/lib/risk.ts และอัปเดตทุกวันผ่าน cron) — ใช้นิยาม
+ * เดียวกับตัวเลข ปกติ/เฝ้าระวัง/เสี่ยงสูง ที่แสดงอยู่แล้วในหน้า Dashboard (getNplStatus) แทนอัตราส่วนมูลค่าเงิน
+ * (overdue/outstanding) แบบเดิม เพราะการเทียบจำนวนสัญญาเข้าใจง่ายกว่าสำหรับผู้ใช้ทั่วไป
+ */
+export async function getOverviewReportRegionRows(
+  scope: VillageScope,
+  level: Extract<AreaLevel, "province" | "district" | "subDistrict">,
+  parentCode?: string,
+  budgetYear?: number
+): Promise<OverviewRegionRow[]> {
+  const villages = await prisma.village.findMany({
+    where: {
+      ...scopeWhereDirect(scope, "id"),
+      ...(budgetYear ? { budgetYear } : {}),
+      ...(level === "district" && parentCode ? { subDistrict: { district: { province: { code: parentCode } } } } : {}),
+      ...(level === "subDistrict" && parentCode ? { subDistrict: { district: { code: parentCode } } } : {}),
+    },
+    include: {
+      households: { select: { id: true, incomeBeforeLoan: true } },
+      subDistrict: { include: { district: { include: { province: true } } } },
+    },
+  });
+  const villageIds = villages.map((v) => v.id);
+
+  const loans = await prisma.loan.findMany({
+    where: { isClosed: false, household: { villageId: { in: villageIds } } },
+    select: { outstandingBalance: true, riskStatus: true, household: { select: { villageId: true } } },
+  });
+
+  const perVillage = villages.map((v) => {
+    const vLoans = loans.filter((l) => l.household.villageId === v.id);
+    const outstandingBalance = vLoans.reduce((s, l) => s + l.outstandingBalance, 0);
+    const normalCount = vLoans.filter((l) => l.riskStatus === "NORMAL").length;
+    const watchlistCount = vLoans.filter((l) => l.riskStatus === "WATCHLIST").length;
+    const highRiskCount = vLoans.filter((l) => l.riskStatus === "HIGH_RISK").length;
+    const incomes = v.households.map((h) => h.incomeBeforeLoan).filter((n): n is number => n != null);
+    const code =
+      level === "province" ? v.subDistrict.district.province.code
+      : level === "district" ? v.subDistrict.district.code
+      : v.subDistrict.code;
+    const name =
+      level === "province" ? v.subDistrict.district.province.name
+      : level === "district" ? v.subDistrict.district.name
+      : v.subDistrict.name;
+    return {
+      code,
+      name,
+      totalVillages: 1,
+      totalHouseholds: v.households.length,
+      outstandingBalance,
+      normalCount,
+      watchlistCount,
+      highRiskCount,
+      incomeSum: incomes.reduce((s, n) => s + n, 0),
+      incomeCount: incomes.length,
+    };
+  });
+
+  const grouped = new Map<
+    string,
+    {
+      code: string; name: string; totalVillages: number; totalHouseholds: number; outstandingBalance: number;
+      normalCount: number; watchlistCount: number; highRiskCount: number; incomeSum: number; incomeCount: number;
+    }
+  >();
+  for (const row of perVillage) {
+    if (!row.code) continue; // ข้ามพื้นที่ที่ยังไม่ได้ตั้งรหัสมาตรฐาน (ไม่มีในระบบจริงตอนนี้ แต่กันไว้)
+    const code = row.code;
+    const existing = grouped.get(code);
+    if (!existing) {
+      grouped.set(code, { ...row, code });
+      continue;
+    }
+    existing.totalVillages += row.totalVillages;
+    existing.totalHouseholds += row.totalHouseholds;
+    existing.outstandingBalance += row.outstandingBalance;
+    existing.normalCount += row.normalCount;
+    existing.watchlistCount += row.watchlistCount;
+    existing.highRiskCount += row.highRiskCount;
+    existing.incomeSum += row.incomeSum;
+    existing.incomeCount += row.incomeCount;
+  }
+
+  return Array.from(grouped.values()).map((r) => ({
+    code: r.code,
+    name: r.name,
+    totalVillages: r.totalVillages,
+    totalHouseholds: r.totalHouseholds,
+    outstandingBalance: r.outstandingBalance,
+    normalCount: r.normalCount,
+    watchlistCount: r.watchlistCount,
+    highRiskCount: r.highRiskCount,
+    avgIncomeBeforeLoan: r.incomeCount > 0 ? r.incomeSum / r.incomeCount : 0,
+  }));
 }
 
 export type VillageConditionRow = {
@@ -446,6 +872,84 @@ export async function getReport2Rows(scope: VillageScope, budgetYear?: number): 
     });
   }
   return rows;
+}
+
+export type Report3Row = {
+  villageName: string;
+  targetHouseholds: number;
+  targetMembers: number;
+  householdsWithLoan: number;
+  membersWithLoan: number;
+  totalFund: number;
+  activeHouseholds: number;
+  activeAmount: number;
+  bankBalance: number;
+  fundShortfall: number;
+  defaultedHouseholds: number;
+  defaultedAmount: number;
+};
+
+/**
+ * รายงาน 3: แบบรายงานฐานข้อมูลหมู่บ้านและครัวเรือนเป้าหมายโครงการ กข.คจ. (ข้อ 27) — ทุกหมู่บ้านในขอบเขต
+ * คอลัมน์ (จ)(ฉ) รายได้ผ่านเกณฑ์ จปฐ., (ฒ) ระดับการพัฒนา, (ณ) หน่วยงานสนับสนุนอื่น ไม่มีข้อมูลจริงรองรับในระบบ
+ * (ไม่มีค่าเกณฑ์ จปฐ. เก็บไว้/เป็นการประเมินเชิงอัตนัยรายปี/ไม่มีฟิลด์) — ปล่อยว่างในชั้น PDF/UI แทนการปั้นข้อมูล
+ */
+export async function getReport3Rows(scope: VillageScope, budgetYear?: number): Promise<Report3Row[]> {
+  const villages = await prisma.village.findMany({
+    where: { ...scopeWhereDirect(scope, "id"), ...(budgetYear ? { budgetYear } : {}) },
+    include: {
+      households: { select: { id: true, memberCount: true } },
+      bankAccounts: { include: { transactions: { orderBy: [{ transactionDate: "desc" }, { id: "desc" }], take: 1 } } },
+      subDistrict: { include: { district: { include: { province: true } } } },
+    },
+    orderBy: { id: "asc" },
+  });
+  const villageIds = villages.map((v) => v.id);
+
+  const loans = await prisma.loan.findMany({
+    where: { household: { villageId: { in: villageIds } } },
+    include: { household: { select: { villageId: true } } },
+  });
+  const snapshots = await prisma.villageStatusSnapshot.findMany({
+    where: { villageId: { in: villageIds } },
+    orderBy: { id: "desc" },
+  });
+  const latestSnapshotByVillage = new Map<number, (typeof snapshots)[number]>();
+  for (const s of snapshots) {
+    if (!latestSnapshotByVillage.has(s.villageId)) latestSnapshotByVillage.set(s.villageId, s);
+  }
+
+  return villages.map((v) => {
+    const vLoans = loans.filter((l) => l.household.villageId === v.id);
+    const active = vLoans.filter((l) => !l.isClosed);
+    const outstandingBalance = active.reduce((s, l) => s + l.outstandingBalance, 0);
+    const bankBalance = v.bankAccounts.reduce((s, a) => s + (a.transactions[0]?.balance ?? 0), 0);
+    const cashOnHand = latestSnapshotByVillage.get(v.id)?.fundElsewhere ?? 0;
+    const totalFund = outstandingBalance + bankBalance + cashOnHand;
+
+    const withLoanHouseholdIds = new Set(vLoans.map((l) => l.householdId));
+    const membersWithLoan = v.households
+      .filter((h) => withLoanHouseholdIds.has(h.id))
+      .reduce((s, h) => s + (h.memberCount ?? 0), 0);
+
+    const activeLoans = active.filter((l) => l.riskStatus !== "HIGH_RISK");
+    const defaultedLoans = active.filter((l) => l.riskStatus === "HIGH_RISK");
+
+    return {
+      villageName: `หมู่ ${v.villageNo} บ้าน${v.villageName} ต.${v.subDistrict.name} อ.${v.subDistrict.district.name} จ.${v.subDistrict.district.province.name}`,
+      targetHouseholds: v.households.length,
+      targetMembers: v.households.reduce((s, h) => s + (h.memberCount ?? 0), 0),
+      householdsWithLoan: withLoanHouseholdIds.size,
+      membersWithLoan,
+      totalFund,
+      activeHouseholds: new Set(activeLoans.map((l) => l.householdId)).size,
+      activeAmount: activeLoans.reduce((s, l) => s + l.outstandingBalance, 0),
+      bankBalance,
+      fundShortfall: v.budgetAmount != null ? Math.max(0, v.budgetAmount - totalFund) : 0,
+      defaultedHouseholds: new Set(defaultedLoans.map((l) => l.householdId)).size,
+      defaultedAmount: defaultedLoans.reduce((s, l) => s + l.outstandingBalance, 0),
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------

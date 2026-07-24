@@ -1,11 +1,13 @@
-// ฟังก์ชันสำหรับส่ง SMS/LINE แจ้งเตือนครัวเรือนเป้าหมาย
-// SMS ยังเป็น Mock (log เท่านั้น) — LINE มอบหมายให้ lib/line/messaging.ts's sendLineNotification เพียงจุดเดียว
-// (Modular: แยก Service ของแต่ละช่องทางออกจากกันชัดเจน ไม่มี Logic ส่ง LINE ซ้ำซ้อนหลายที่ในระบบ)
+// ฟังก์ชันสำหรับส่ง SMS/LINE/Telegram แจ้งเตือนครัวเรือนเป้าหมาย
+// SMS ยังเป็น Mock (log เท่านั้น) — LINE มอบหมายให้ lib/line/messaging.ts's sendLineNotification, Telegram มอบหมายให้
+// lib/telegram/messaging.ts's sendTelegramNotification เพียงจุดเดียวต่อช่องทาง
+// (Modular: แยก Service ของแต่ละช่องทางออกจากกันชัดเจน ไม่มี Logic ส่งซ้ำซ้อนหลายที่ในระบบ)
 
 import { prisma } from "@/lib/prisma";
 import { sendLineNotification } from "@/lib/line/messaging";
+import { sendTelegramNotification } from "@/lib/telegram/messaging";
 
-export type ChannelResult = { success: boolean; channel: "sms" | "line"; detail: string };
+export type ChannelResult = { success: boolean; channel: "sms" | "line" | "telegram"; detail: string };
 
 export async function sendSms(phoneNumber: string, message: string): Promise<ChannelResult> {
   console.log(`[MOCK SMS] -> ${phoneNumber}: ${message}`);
@@ -17,14 +19,20 @@ export async function sendLineMessage(userId: number, message: string): Promise<
   return { success: result.success, channel: "line", detail: result.detail };
 }
 
-/** ส่งแจ้งเตือนครัวเรือนผ่านทุกช่องทางที่มีข้อมูลติดต่อ (เบอร์โทร/LINE) — ถ้าไม่มีข้อมูลติดต่อเลยจะไม่ส่งอะไร */
+export async function sendTelegramMessage(userId: number, message: string): Promise<ChannelResult> {
+  const result = await sendTelegramNotification(userId, message);
+  return { success: result.success, channel: "telegram", detail: result.detail };
+}
+
+/** ส่งแจ้งเตือนครัวเรือนผ่านทุกช่องทางที่มีข้อมูลติดต่อ (เบอร์โทร/LINE/Telegram) — ถ้าไม่มีข้อมูลติดต่อเลยจะไม่ส่งอะไร */
 export async function notifyHousehold(
-  user: { id: number; phoneNumber: string | null; lineId: string | null },
+  user: { id: number; phoneNumber: string | null; lineId: string | null; telegramChatId: string | null },
   message: string
 ): Promise<ChannelResult[]> {
   const results: ChannelResult[] = [];
   if (user.phoneNumber) results.push(await sendSms(user.phoneNumber, message));
   if (user.lineId) results.push(await sendLineMessage(user.id, message));
+  if (user.telegramChatId) results.push(await sendTelegramMessage(user.id, message));
   return results;
 }
 

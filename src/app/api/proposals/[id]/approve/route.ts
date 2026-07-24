@@ -4,6 +4,7 @@ import { committeeApprovalSchema } from "@/lib/schemas";
 import { getCurrentUser } from "@/lib/auth";
 import { getAllowedVillageIds, canAccessHouseholdRecord } from "@/lib/scope";
 import { ACCESS_DENIED_MESSAGE, canApproveProposalOrLoanRequest } from "@/lib/authz";
+import { hasVillageMeetingRecord, MEETING_RECORD_REQUIRED_MESSAGE } from "@/lib/meetings";
 import { notifyUsers } from "@/lib/notifications/notifyUsers";
 
 // แบบฟอร์ม 1 (แบบเสนอโครงการ): ประธานคณะกรรมการหมู่บ้าน (CHAIRMAN) เท่านั้นเป็นผู้อนุมัติ — ทำได้ก็ต่อเมื่อพัฒนากรให้ความเห็นแล้ว
@@ -34,6 +35,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       { error: { formErrors: ["ต้องรอความเห็นของพัฒนากรก่อน จึงจะพิจารณาอนุมัติได้"] } },
       { status: 409 }
     );
+  }
+
+  if (!(await hasVillageMeetingRecord(proposal.household.villageId))) {
+    return NextResponse.json({ error: { formErrors: [MEETING_RECORD_REQUIRED_MESSAGE] } }, { status: 409 });
   }
 
   const body = await request.json();

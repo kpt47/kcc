@@ -5,8 +5,8 @@ import { notifyHousehold } from "./channels";
 import type { NotificationType } from "@/generated/prisma/client";
 
 /**
- * สร้าง Notification ในระบบให้ผู้ใช้ตาม userIds ที่ระบุ พร้อมพยายามส่ง SMS/LINE (mock) เพิ่มเติม
- * ให้ผู้รับที่มีเบอร์โทร/LINE ID บันทึกไว้ — ใช้ได้กับผู้ใช้ทุก role ไม่จำกัดเฉพาะครัวเรือน
+ * สร้าง Notification ในระบบให้ผู้ใช้ตาม userIds ที่ระบุ พร้อมพยายามส่ง SMS/LINE/Telegram (mock) เพิ่มเติม
+ * ให้ผู้รับที่มีเบอร์โทร/LINE ID/Telegram chat_id บันทึกไว้ — ใช้ได้กับผู้ใช้ทุก role ไม่จำกัดเฉพาะครัวเรือน
  */
 export async function notifyUsers(
   userIds: number[],
@@ -22,7 +22,7 @@ export async function notifyUsers(
 
   const recipients = await prisma.user.findMany({
     where: { id: { in: userIds } },
-    select: { id: true, phoneNumber: true, lineId: true },
+    select: { id: true, phoneNumber: true, lineId: true, telegramChatId: true },
   });
   for (const recipient of recipients) {
     await notifyHousehold(recipient, message);

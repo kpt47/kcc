@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Search, X, Loader2, Landmark, Banknote, CalendarCheck, SearchX } from "lucide-react";
+import { Search, X, Loader2, Landmark, Banknote, CalendarCheck, SearchX, BookOpen } from "lucide-react";
 import type {
   DashboardSearchResult,
   VillageSearchResult,
   HouseholdSearchResult,
   BudgetYearSearchResult,
   MeetingSearchResult,
+  BankAccountSearchResult,
 } from "@/lib/dashboardSearch";
 
 const DEBOUNCE_MS = 300;
@@ -74,7 +75,7 @@ export function SmartOmnibar() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setOpen(true)}
-          placeholder="ค้นหาชื่อหมู่บ้าน, ชื่อครัวเรือนเป้าหมาย, หรือปีงบประมาณ..."
+          placeholder="ค้นหาชื่อหมู่บ้าน, ชื่อครัวเรือนเป้าหมาย, เลขบัญชี/ชื่อธนาคาร, หรือปีงบประมาณ..."
           className="min-h-14 w-full rounded-2xl border border-slate-300 bg-white pl-12 pr-11 text-base shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
         />
         {query && (
@@ -137,6 +138,8 @@ function ResultItem({ result }: { result: DashboardSearchResult }) {
       return <BudgetYearResult result={result} />;
     case "meeting":
       return <MeetingResult result={result} />;
+    case "bankAccount":
+      return <BankAccountResult result={result} />;
     default:
       return null;
   }
@@ -159,9 +162,24 @@ function VillageResult({ result }: { result: VillageSearchResult }) {
           <p className="text-sm font-bold text-rose-700">{money(result.yellowBookOutstanding)}</p>
         </div>
       </div>
-      <div className="mt-2 flex justify-end gap-2">
+      <div className="mt-2 flex flex-wrap justify-end gap-2">
         <QuickLink href="/bank-accounts" label="ดูเล่มเขียว" icon={Landmark} />
         <QuickLink href="/loans" label="ดูเล่มเหลือง" icon={Banknote} />
+        {result.canSeeVillageStatus && <QuickLink href="/villages" label="ดูเล่มน้ำตาล" icon={BookOpen} />}
+      </div>
+    </div>
+  );
+}
+
+// รูปแบบ E: การ์ดยอดคงเหลือล่าสุดของบัญชีธนาคารที่เลขบัญชี/ชื่อธนาคาร/สาขาตรงกับคำค้นหา
+function BankAccountResult({ result }: { result: BankAccountSearchResult }) {
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+      <p className="text-sm font-bold text-emerald-900">{result.label}</p>
+      <p className="text-xs text-slate-500">{result.villageLabel}</p>
+      <p className="mt-1 text-sm font-bold text-emerald-700">ยอดคงเหลือล่าสุด: {money(result.latestBalance)}</p>
+      <div className="mt-2 flex justify-end">
+        <QuickLink href="/bank-accounts" label="ดูเล่มเขียว" icon={Landmark} />
       </div>
     </div>
   );
@@ -238,7 +256,7 @@ function BudgetYearResult({ result }: { result: BudgetYearSearchResult }) {
         </ResponsiveContainer>
       </div>
       <div className="mt-2 flex justify-end">
-        <QuickLink href="/reports" label="ดูรายงานราชการ" icon={Landmark} />
+        <QuickLink href="/official-reports" label="ดูแบบรายงานภาวะหนี้สินฯ" icon={Landmark} />
       </div>
     </div>
   );

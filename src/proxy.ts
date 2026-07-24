@@ -9,7 +9,6 @@ import {
   canCreateVillage,
   canUseSmartSearch,
   isItSupportBlockedFromProgramData,
-  hasMinRole,
 } from "@/lib/authz";
 import type { GlobalRole, CommitteeRole } from "@/generated/prisma/client";
 
@@ -34,7 +33,6 @@ const PROTECTED_PATHS: { prefix: string; allowed: (user: GuardUser) => boolean }
   { prefix: "/master-data", allowed: canCreateVillage },
   { prefix: "/admin/audit-logs", allowed: canViewAuditLog },
   { prefix: "/reports/smart", allowed: canUseSmartSearch },
-  { prefix: "/reports", allowed: (user) => hasMinRole(user, "DISTRICT_ADMIN") },
   { prefix: "/official-reports", allowed: (user) => user.role !== "HOUSEHOLD" && user.role !== "IT_SUPPORT" },
   { prefix: "/households", allowed: (user) => !isItSupportBlockedFromProgramData(user) },
   { prefix: "/loans", allowed: (user) => !isItSupportBlockedFromProgramData(user) },

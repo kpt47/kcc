@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/dashboard/LogoutButton";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { getNavLinks } from "@/lib/navLinks";
+import { getNavLinks, withSectionHeaders, NAV_GROUP_STYLE } from "@/lib/navLinks";
 import { BRAND, BRAND_ALT } from "@/lib/branding";
 import type { CurrentUser } from "@/lib/auth";
 
@@ -56,11 +56,29 @@ export function TopNav({ user }: { user: CurrentUser }) {
         </div>
       </div>
 
-      {/* แผงเมนูแบบ Toggle — ซ่อนตัวอัตโนมัติเมื่อกดเลือกเมนูแล้ว */}
+      {/* แผงเมนูแบบ Toggle — ซ่อนตัวอัตโนมัติเมื่อกดเลือกเมนูแล้ว
+          pb-16 กันไม่ให้แถวสุดท้าย (เปลี่ยนรหัสผ่าน/ออกจากระบบ) โดน BottomNav (fixed, z-20 เท่ากัน แต่อยู่หลังใน DOM
+          จึงวาดทับ) บังไว้เมื่อรายการเมนูยาวจนเกินความสูงจอ (เกิดกับ role ที่มีเมนูเยอะ เช่น GLOBAL_ADMIN) */}
       {open && (
-        <nav className="border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900">
+        <nav className="max-h-[calc(100dvh-3.5rem)] overflow-y-auto border-t border-slate-200 bg-white px-4 py-3 pb-16 dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-col gap-1">
-            {links.map((l) => {
+            {withSectionHeaders(links).map((item, idx) => {
+              if (item.type === "header") {
+                const style = NAV_GROUP_STYLE[item.group];
+                const HeaderIcon = style?.icon;
+                return (
+                  <p
+                    key={`header-${item.label}-${idx}`}
+                    className={`mt-4 mb-1.5 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide first:mt-0 ${
+                      style ? `${style.bg} ${style.text}` : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                    }`}
+                  >
+                    {HeaderIcon && <HeaderIcon className="h-4 w-4 shrink-0" />}
+                    <span>{item.label}</span>
+                  </p>
+                );
+              }
+              const l = item.link;
               const active = pathname === l.href;
               const Icon = l.icon;
               return (
@@ -90,7 +108,7 @@ export function TopNav({ user }: { user: CurrentUser }) {
                 onClick={() => setOpen(false)}
                 className="min-h-11 rounded-lg px-3 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950"
               >
-                เปลี่ยนรหัสผ่าน
+                การตั้งค่าผู้ใช้งาน
               </Link>
               <LogoutButton />
             </div>

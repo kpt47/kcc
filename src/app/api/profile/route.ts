@@ -57,6 +57,16 @@ export async function PATCH(request: Request) {
         }
       : undefined;
 
+  const householdProfileUpdate =
+    user.role === "HOUSEHOLD" && data.reminderLeadDays !== undefined
+      ? {
+          upsert: {
+            update: { reminderLeadDays: data.reminderLeadDays },
+            create: { reminderLeadDays: data.reminderLeadDays },
+          },
+        }
+      : undefined;
+
   await prisma.user.update({
     where: { id: user.id },
     data: {
@@ -65,6 +75,7 @@ export async function PATCH(request: Request) {
       lineId: data.lineId,
       committeeProfile: user.role === "VILLAGE_COMMITTEE" ? profileUpdate : undefined,
       officialProfile: user.role !== "HOUSEHOLD" && user.role !== "VILLAGE_COMMITTEE" ? profileUpdate : undefined,
+      householdProfile: householdProfileUpdate,
     },
   });
 

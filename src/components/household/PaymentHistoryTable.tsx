@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CheckCircle2, Clock3, XCircle, Receipt as ReceiptIcon } from "lucide-react";
 import { formatThaiDate } from "@/lib/thai";
 import { ReceiptModal } from "@/components/receipts/ReceiptModal";
 import type { ReceiptData } from "@/components/receipts/ReceiptTemplate";
@@ -29,6 +30,12 @@ const STATUS_CLASS: Record<PaymentHistoryRow["status"], string> = {
   REJECTED: "bg-rose-100 text-rose-700",
 };
 
+const STATUS_ICON: Record<PaymentHistoryRow["status"], typeof CheckCircle2> = {
+  PENDING: Clock3,
+  APPROVED: CheckCircle2,
+  REJECTED: XCircle,
+};
+
 export function PaymentHistoryTable({ rows, receiptBase }: { rows: PaymentHistoryRow[]; receiptBase: Omit<ReceiptData, "installmentNo" | "amount" | "paymentDate" | "outstandingBalanceAfter"> }) {
   const [viewingReceipt, setViewingReceipt] = useState<ReceiptData | null>(null);
 
@@ -42,14 +49,19 @@ export function PaymentHistoryTable({ rows, receiptBase }: { rows: PaymentHistor
 
   return (
     <div className="flex flex-col gap-3">
-      {rows.map((row) => (
+      {rows.map((row) => {
+        const StatusIcon = STATUS_ICON[row.status];
+        return (
         <div key={row.id} className="rounded-xl border border-slate-200 bg-white p-3">
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-sm font-semibold text-slate-800">{formatThaiDate(row.paymentDate)}</p>
               <p className="text-sm text-slate-600">{row.amount.toLocaleString("th-TH")} บาท</p>
             </div>
-            <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_CLASS[row.status]}`}>
+            <span
+              className={`flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_CLASS[row.status]}`}
+            >
+              <StatusIcon className="h-3.5 w-3.5 shrink-0" aria-hidden />
               {STATUS_LABEL[row.status]}
             </span>
           </div>
@@ -89,13 +101,15 @@ export function PaymentHistoryTable({ rows, receiptBase }: { rows: PaymentHistor
                   outstandingBalanceAfter: row.outstandingBalanceAfter!,
                 })
               }
-              className="mt-2 inline-flex min-h-9 items-center rounded-full border border-emerald-300 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+              className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-emerald-300 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
             >
+              <ReceiptIcon className="h-4 w-4 shrink-0" aria-hidden />
               ดาวน์โหลดใบเสร็จรับเงิน (ฟอร์ม 5)
             </button>
           )}
         </div>
-      ))}
+        );
+      })}
 
       {viewingReceipt && <ReceiptModal data={viewingReceipt} onClose={() => setViewingReceipt(null)} />}
     </div>

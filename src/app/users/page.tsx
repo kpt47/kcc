@@ -5,6 +5,8 @@ import { ResetPasswordAction } from "@/components/users/ResetPasswordAction";
 import { prisma } from "@/lib/prisma";
 import { computeDisplayName, requireUser, ROLE_LABELS, COMMITTEE_ROLE_LABELS } from "@/lib/auth";
 import { canManageTargetRole, getManagedUserWhere, isUserManager } from "@/lib/userManagement";
+import { PDPA_POLICY_VERSION } from "@/lib/pdpa";
+import { formatThaiDate } from "@/lib/thai";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +57,12 @@ export default async function UsersPage() {
       committeeProfile: true,
       officialProfile: true,
       household: { select: { headFirstName: true, headLastName: true } },
+      pdpaConsents: {
+        where: { policyVersion: PDPA_POLICY_VERSION },
+        orderBy: { acceptedAt: "desc" },
+        take: 1,
+        select: { acceptedAt: true },
+      },
     },
   });
   const users = usersRaw.map((u) => ({ ...u, displayName: computeDisplayName(u) }));
@@ -88,13 +96,24 @@ export default async function UsersPage() {
                     <p className="text-sm text-slate-500">เบอร์โทรศัพท์: {u.phoneNumber}</p>
                     <p className="text-sm text-slate-500">อีเมล: {u.email}</p>
                   </div>
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      u.isActive ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-700"
-                    }`}
-                  >
-                    {u.isActive ? "ใช้งานอยู่" : "ถูกระงับ"}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        u.isActive ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-700"
+                      }`}
+                    >
+                      {u.isActive ? "ใช้งานอยู่" : "ถูกระงับ"}
+                    </span>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        u.pdpaConsents[0] ? "bg-sky-100 text-sky-800" : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {u.pdpaConsents[0]
+                        ? `ยอมรับ PDPA แล้ว (${formatThaiDate(u.pdpaConsents[0].acceptedAt)})`
+                        : "ยังไม่ยอมรับ PDPA"}
+                    </span>
+                  </div>
                 </div>
 
                 {manageable && (

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { ProfileMenu } from "@/components/layout/ProfileMenu";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { getNavLinks } from "@/lib/navLinks";
+import { getNavLinks, withSectionHeaders, NAV_GROUP_STYLE } from "@/lib/navLinks";
 import { BRAND, BRAND_ALT } from "@/lib/branding";
 import type { CurrentUser } from "@/lib/auth";
 
@@ -30,7 +30,23 @@ export function Sidebar({ user }: { user: CurrentUser }) {
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="flex flex-col gap-1">
-          {links.map((l) => {
+          {withSectionHeaders(links).map((item, idx) => {
+            if (item.type === "header") {
+              const style = NAV_GROUP_STYLE[item.group];
+              const HeaderIcon = style?.icon;
+              return (
+                <li
+                  key={`header-${item.label}-${idx}`}
+                  className={`mt-4 mb-1.5 flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide first:mt-0 ${
+                    style ? `${style.bg} ${style.text}` : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                  }`}
+                >
+                  {HeaderIcon && <HeaderIcon className="h-4 w-4 shrink-0" />}
+                  <span>{item.label}</span>
+                </li>
+              );
+            }
+            const l = item.link;
             const active = pathname === l.href;
             const Icon = l.icon;
             return (

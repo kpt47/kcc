@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppShell } from "@/components/layout/AppShell";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
+import { PdpaConsentGate } from "@/components/pdpa/PdpaConsentGate";
 import { getCurrentUser } from "@/lib/auth";
+import { hasAcceptedCurrentPdpa, PDPA_POLICY_SECTIONS } from "@/lib/pdpa";
 
 export const metadata: Metadata = {
   title: "ระบบ กข.คจ.",
@@ -21,6 +23,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUser();
+  const needsPdpaConsent = user ? !(await hasAcceptedCurrentPdpa(user.id)) : false;
 
   return (
     <html lang="th" className="h-full antialiased" suppressHydrationWarning>
@@ -33,8 +36,12 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <ThemeProvider>
-          <AppShell user={user}>{children}</AppShell>
+        <ThemeProvider forcedTheme={user ? undefined : "light"}>
+          {needsPdpaConsent ? (
+            <PdpaConsentGate sections={PDPA_POLICY_SECTIONS} />
+          ) : (
+            <AppShell user={user}>{children}</AppShell>
+          )}
         </ThemeProvider>
       </body>
     </html>

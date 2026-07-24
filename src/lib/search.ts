@@ -4,6 +4,7 @@
 import { prisma } from "./prisma";
 import { type VillageScope } from "./scope";
 import type { SmartSearchFilters } from "./schemas";
+import { GOVERNMENT_FUND_PRINCIPAL } from "./analytics";
 
 async function resolveFilteredVillageIds(
   scope: VillageScope,
@@ -162,6 +163,10 @@ export type VillageMapSummary = {
   totalLoaned: number;
   bankBalance: number;
   overduePercent: number;
+  requiredFund: number;
+  currentFund: number;
+  fundShortfall: number;
+  fundAtRisk: boolean;
 };
 
 /**
@@ -198,6 +203,11 @@ export async function getVillageMapSummaries(scope: VillageScope): Promise<Villa
       (worst, l) => (RISK_RANK[l.riskStatus] > RISK_RANK[worst] ? l.riskStatus : worst),
       "NORMAL"
     );
+    // เงินทุนต้นทุนรัฐบาล (280,000 บาท เป็นค่าเริ่มต้น) ต้องมีครบเสมอ — ถ้าเงินฝากธนาคาร + ยอดเงินยืมคงเหลือ
+    // กับครัวเรือน ต่ำกว่านี้ แปลว่ามีเงินทุนสูญหายไปจากระบบจริง (นอกเหนือจากที่อยู่ระหว่างให้ยืม) — ปักหมุดเตือนไว้
+    const requiredFund = v.budgetAmount ?? GOVERNMENT_FUND_PRINCIPAL;
+    const currentFund = outstanding + bankBalance;
+    const fundShortfall = Math.max(0, requiredFund - currentFund);
 
     return {
       id: v.id,
@@ -208,6 +218,10 @@ export async function getVillageMapSummaries(scope: VillageScope): Promise<Villa
       totalLoaned,
       bankBalance,
       overduePercent: outstanding > 0 ? (overdueAmount / outstanding) * 100 : 0,
+      requiredFund,
+      currentFund,
+      fundShortfall,
+      fundAtRisk: fundShortfall > 0,
     };
   });
 }

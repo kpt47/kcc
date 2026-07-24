@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { ProvinceSummaryReportView } from "./ProvinceSummaryReportView";
 import { FundProblemReportView } from "./FundProblemReportView";
+import { VillageDatabaseReportView } from "./VillageDatabaseReportView";
 
 export function ProvinceLevelTabs({ isProvincialAdmin }: { isProvincialAdmin: boolean }) {
-  const [tab, setTab] = useState<"summary" | "problems">("summary");
+  const [tab, setTab] = useState<"summary" | "problems" | "database">("summary");
 
   return (
     <div className="flex flex-col gap-4">
@@ -24,8 +25,21 @@ export function ProvinceLevelTabs({ isProvincialAdmin }: { isProvincialAdmin: bo
         >
           รายงานสภาพปัญหาการบริหารเงินทุน
         </button>
+        <button
+          type="button"
+          onClick={() => setTab("database")}
+          className={`min-h-11 border-b-2 px-3 text-sm font-semibold ${tab === "database" ? "border-emerald-600 text-emerald-700" : "border-transparent text-slate-500"}`}
+        >
+          แบบฐานข้อมูลหมู่บ้าน (ข้อ 27)
+        </button>
       </div>
-      {tab === "summary" ? <ProvinceSummaryReportView isProvincialAdmin={isProvincialAdmin} /> : <FundProblemReportView />}
+      {tab === "summary" ? (
+        <ProvinceSummaryReportView isProvincialAdmin={isProvincialAdmin} />
+      ) : tab === "problems" ? (
+        <FundProblemReportView />
+      ) : (
+        <VillageDatabaseReportView />
+      )}
     </div>
   );
 }

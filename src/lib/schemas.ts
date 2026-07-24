@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { LOAN_CEILING_DEFAULT } from "./config";
+import { REMINDER_LEAD_DAY_OPTIONS } from "./reminderSettings";
 
 /**
  * ช่องตัวเลขที่ไม่บังคับกรอก: input จาก <input type="number"> ที่ว่างเปล่าจะได้ค่า NaN
@@ -107,8 +108,28 @@ export const selfProfileSchema = z.object({
   lineId: z.string().optional(),
   firstName: z.string().trim().min(1, "กรุณากรอกชื่อ").optional(),
   lastName: z.string().trim().min(1, "กรุณากรอกนามสกุล").optional(),
+  // จำนวนวันล่วงหน้าก่อนครบกำหนดชำระที่ครัวเรือนต้องการรับแจ้งเตือน — เฉพาะ role HOUSEHOLD (ดู /api/profile)
+  reminderLeadDays: z
+    .number()
+    .int()
+    .refine((v) => (REMINDER_LEAD_DAY_OPTIONS as readonly number[]).includes(v), "กรุณาเลือกจำนวนวันที่ระบบรองรับ")
+    .optional(),
 });
 export type SelfProfileFormValues = z.infer<typeof selfProfileSchema>;
+
+// ประธานกรรมการหมู่บ้านกำหนดวันเริ่มยืนยันยอดหนี้ประจำปี — /api/debt-confirmation/round
+export const debtConfirmationRoundSchema = z.object({
+  year: z.number().int().min(2500, "กรุณากรอกปี พ.ศ. ให้ถูกต้อง").max(2700, "กรุณากรอกปี พ.ศ. ให้ถูกต้อง"),
+  confirmationDate: requiredIsoDate,
+});
+export type DebtConfirmationRoundFormValues = z.infer<typeof debtConfirmationRoundSchema>;
+
+// ครัวเรือนยืนยัน/แจ้งข้อโต้แย้งยอดหนี้ของตนเองต่อรอบที่เปิดอยู่ — /api/debt-confirmation/confirm
+export const debtConfirmationSchema = z.object({
+  agreesWithBalance: z.boolean(),
+  note: z.string().trim().max(500, "หมายเหตุยาวเกินไป").optional(),
+});
+export type DebtConfirmationFormValues = z.infer<typeof debtConfirmationSchema>;
 
 // ค้นหา/กรองครัวเรือนเป้าหมาย — /api/households/search
 export const householdSearchSchema = z.object({
@@ -661,6 +682,18 @@ export const meetingRecordSchema = z.object({
   fileUrl: z.string().trim().min(1, "กรุณาแนบไฟล์วาระการประชุม (.pdf, .jpg, .png)"),
 });
 export type MeetingRecordValues = z.infer<typeof meetingRecordSchema>;
+
+// ---------------------------------------------------------------------------
+// บันทึกการติดตาม/ให้ข้อแนะนำของพัฒนากรตำบล (Visit Log) — /api/visit-logs
+// ---------------------------------------------------------------------------
+export const visitLogSchema = z.object({
+  villageId: z.number({ error: "กรุณาเลือกหมู่บ้าน" }).int().positive(),
+  visitDate: requiredIsoDate,
+  visitType: z.string().trim().min(1, "กรุณาเลือกประเภทการลงพื้นที่"),
+  notes: z.string().trim().max(2000, "หมายเหตุยาวเกินไป").optional(),
+  attachmentUrls: z.array(z.string().trim().min(1)).max(10, "แนบไฟล์ได้สูงสุด 10 ไฟล์ต่อรายการ").optional(),
+});
+export type VisitLogValues = z.infer<typeof visitLogSchema>;
 
 export const editBankTransactionSchema = z.object({
   transactionDate: z.string().min(1).optional(),

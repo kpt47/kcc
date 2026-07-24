@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { Turnstile } from "@marsidev/react-turnstile";
+import { Mail, Phone, Printer } from "lucide-react";
 import { TextField } from "@/components/form/TextField";
 import { loginSchema, type LoginFormValues } from "@/lib/schemas";
 import { BRAND, BRAND_ALT } from "@/lib/branding";
@@ -79,6 +80,27 @@ export default function LoginPage() {
           ลืมรหัสผ่าน (Forgot Password)
         </Link>
       </form>
+
+      <footer className="flex flex-col items-center gap-1.5 border-t border-slate-200 pt-5 text-center text-xs leading-relaxed text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        <p className="font-semibold text-slate-600 dark:text-slate-300">สำนักพัฒนาทุนและองค์กรการเงินชุมชน</p>
+        <p>กรมการพัฒนาชุมชน กระทรวงมหาดไทย</p>
+        <p>
+          ศูนย์ราชการเฉลิมพระเกียรติฯ อาคารรัฐประศาสนภักดี (อาคาร B)
+          <br />
+          ชั้น 3 ถนนแจ้งวัฒนะ หลักสี่ กรุงเทพฯ 10210
+        </p>
+        <div className="mt-1 flex flex-col items-center gap-1">
+          <span className="inline-flex items-center gap-1.5">
+            <Mail className="h-3.5 w-3.5 shrink-0" /> fund@cdd.mail.go.th
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Phone className="h-3.5 w-3.5 shrink-0" /> 0-2141-6315, 0-2141-6374
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <Printer className="h-3.5 w-3.5 shrink-0" /> 0-2143-8908, 0-2143-8909
+          </span>
+        </div>
+      </footer>
     </main>
   );
 }

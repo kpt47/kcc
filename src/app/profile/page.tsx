@@ -4,6 +4,8 @@ import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
 import { ChangePasswordForm } from "@/components/profile/ChangePasswordForm";
 import { EditSelfProfileForm } from "@/components/profile/EditSelfProfileForm";
 import { LineConnectButton } from "@/components/profile/LineConnectButton";
+import { TelegramConnectButton } from "@/components/profile/TelegramConnectButton";
+import { ReminderSettingsForm } from "@/components/profile/ReminderSettingsForm";
 
 export default async function ProfilePage() {
   const user = await requireUser();
@@ -12,7 +14,7 @@ export default async function ProfilePage() {
 
   const dbUser = await prisma.user.findUniqueOrThrow({
     where: { id: user.id },
-    select: { phoneNumber: true, email: true, lineId: true },
+    select: { phoneNumber: true, email: true, lineId: true, telegramChatId: true },
   });
   const householdView = user.role === "HOUSEHOLD" ? await getHouseholdProfileView(user) : null;
   const committeeProfile =
@@ -130,6 +132,19 @@ export default async function ProfilePage() {
       <SectionCard title="การแจ้งเตือนผ่าน LINE" description="เชื่อมต่อบัญชี LINE ของคุณเพื่อรับการแจ้งเตือนจากระบบ">
         <LineConnectButton connected={!!dbUser.lineId} />
       </SectionCard>
+
+      <SectionCard title="การแจ้งเตือนผ่าน Telegram" description="เชื่อมต่อบัญชี Telegram ของคุณเพื่อรับการแจ้งเตือนจากระบบ">
+        <TelegramConnectButton connected={!!dbUser.telegramChatId} />
+      </SectionCard>
+
+      {householdView && (
+        <SectionCard
+          title="ตั้งเวลาแจ้งเตือนก่อนครบกำหนดชำระเงิน"
+          description="เลือกจำนวนวันล่วงหน้าที่ต้องการให้ระบบแจ้งเตือนก่อนถึงวันครบกำหนดชำระเงินยืมแต่ละงวด"
+        >
+          <ReminderSettingsForm reminderLeadDays={householdView.reminderLeadDays} />
+        </SectionCard>
+      )}
 
       <SectionCard title="เปลี่ยนรหัสผ่าน" description="กรอกรหัสผ่านเดิมและรหัสผ่านใหม่ที่ต้องการเปลี่ยน">
         <ChangePasswordForm />

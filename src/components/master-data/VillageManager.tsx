@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { confirmDialog } from "@/lib/confirmDialog";
 import { AddressCombobox, type AddressOption } from "@/components/form/AddressCombobox";
+import { VillageLocationPicker } from "./VillageLocationPicker";
 import type { GlobalRole } from "@/generated/prisma/client";
 
 export type VillageRow = {
@@ -288,26 +289,44 @@ export function VillageManager({
             required
             className="min-h-10 w-36 rounded-lg border border-slate-300 px-2 text-sm"
           />
-          <input
-            type="number"
-            step="any"
-            value={newLat}
-            onChange={(e) => setNewLat(e.target.value)}
-            placeholder="ละติจูด (ถ้ามี)"
-            className="min-h-10 w-32 rounded-lg border border-slate-300 px-2 text-sm"
-          />
-          <input
-            type="number"
-            step="any"
-            value={newLng}
-            onChange={(e) => setNewLng(e.target.value)}
-            placeholder="ลองจิจูด (ถ้ามี)"
-            className="min-h-10 w-32 rounded-lg border border-slate-300 px-2 text-sm"
-          />
           <button type="submit" disabled={submitting} className="min-h-10 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white disabled:opacity-60">
             + เพิ่มหมู่บ้าน
           </button>
           {error && <p className="text-xs font-medium text-rose-600">{error}</p>}
+
+          <div className="flex w-full flex-col gap-1.5">
+            <label className="text-xs font-medium text-slate-500">
+              พิกัดหมู่บ้าน (คลิกบนแผนที่เพื่อปักหมุด — ป้องกันลืมตั้งพิกัด ทำให้ไม่ขึ้นใน &quot;มุมมองแผนที่&quot; ของ Smart Report)
+            </label>
+            <div className="w-full sm:max-w-md">
+              <VillageLocationPicker
+                latitude={newLat ? Number(newLat) : null}
+                longitude={newLng ? Number(newLng) : null}
+                onPick={(lat, lng) => {
+                  setNewLat(lat.toFixed(6));
+                  setNewLng(lng.toFixed(6));
+                }}
+              />
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                step="any"
+                value={newLat}
+                onChange={(e) => setNewLat(e.target.value)}
+                placeholder="ละติจูด (หรือคลิกแผนที่ด้านบน)"
+                className="min-h-10 w-44 rounded-lg border border-slate-300 px-2 text-sm"
+              />
+              <input
+                type="number"
+                step="any"
+                value={newLng}
+                onChange={(e) => setNewLng(e.target.value)}
+                placeholder="ลองจิจูด (หรือคลิกแผนที่ด้านบน)"
+                className="min-h-10 w-44 rounded-lg border border-slate-300 px-2 text-sm"
+              />
+            </div>
+          </div>
         </form>
       )}
 
@@ -315,29 +334,41 @@ export function VillageManager({
         {villages.map((v) => (
           <div key={v.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
             {editingId === v.id ? (
-              <div className="flex flex-1 flex-wrap gap-1.5">
+              <div className="flex flex-1 flex-col gap-1.5">
                 <input
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="min-h-8 flex-1 rounded-lg border border-slate-300 px-2 text-sm"
+                  className="min-h-8 w-full rounded-lg border border-slate-300 px-2 text-sm"
                 />
-                <input
-                  type="number"
-                  step="any"
-                  value={editLat}
-                  onChange={(e) => setEditLat(e.target.value)}
-                  placeholder="ละติจูด"
-                  className="min-h-8 w-28 rounded-lg border border-slate-300 px-2 text-sm"
-                />
-                <input
-                  type="number"
-                  step="any"
-                  value={editLng}
-                  onChange={(e) => setEditLng(e.target.value)}
-                  placeholder="ลองจิจูด"
-                  className="min-h-8 w-28 rounded-lg border border-slate-300 px-2 text-sm"
-                />
+                <div className="w-full sm:max-w-md">
+                  <VillageLocationPicker
+                    latitude={editLat ? Number(editLat) : null}
+                    longitude={editLng ? Number(editLng) : null}
+                    onPick={(lat, lng) => {
+                      setEditLat(lat.toFixed(6));
+                      setEditLng(lng.toFixed(6));
+                    }}
+                  />
+                </div>
+                <div className="flex gap-1.5">
+                  <input
+                    type="number"
+                    step="any"
+                    value={editLat}
+                    onChange={(e) => setEditLat(e.target.value)}
+                    placeholder="ละติจูด"
+                    className="min-h-8 w-28 rounded-lg border border-slate-300 px-2 text-sm"
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    value={editLng}
+                    onChange={(e) => setEditLng(e.target.value)}
+                    placeholder="ลองจิจูด"
+                    className="min-h-8 w-28 rounded-lg border border-slate-300 px-2 text-sm"
+                  />
+                </div>
               </div>
             ) : (
               <span>

@@ -1,4 +1,5 @@
 import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
+import { SmartOmnibar } from "@/components/dashboard/SmartOmnibar";
 import { prisma } from "@/lib/prisma";
 import { THEMES } from "@/lib/theme";
 import { formatThaiDate } from "@/lib/thai";
@@ -49,6 +50,8 @@ export default async function VillagesPage() {
       <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${theme.badgeBg} ${theme.badgeText}`}>
         {theme.bookLabel}
       </span>
+
+      <SmartOmnibar />
 
       {villages.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
