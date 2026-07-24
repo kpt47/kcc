@@ -25,6 +25,9 @@ export default function NewProposalPage() {
   const [selectedHousehold, setSelectedHousehold] = useState<HouseholdOption | undefined>();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [createdNumbers, setCreatedNumbers] = useState<{ volumeNo: number | null; proposalNo: number | null } | null>(
+    null
+  );
 
   const {
     register,
@@ -78,6 +81,8 @@ export default function NewProposalPage() {
       setSubmitError(body?.error?.formErrors?.[0] ?? "บันทึกข้อมูลไม่สำเร็จ กรุณาตรวจสอบข้อมูลอีกครั้ง");
       return;
     }
+    const created = await res.json();
+    setCreatedNumbers({ volumeNo: created.volumeNo, proposalNo: created.proposalNo });
     setSuccess(true);
   }
 
@@ -86,6 +91,11 @@ export default function NewProposalPage() {
       <PageContainer title="แบบเสนอโครงการ">
         <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-5 text-emerald-800">
           <p className="text-base font-bold">บันทึกแบบเสนอโครงการเรียบร้อยแล้ว ✓</p>
+          {createdNumbers && (
+            <p className="mt-1 text-sm">
+              เล่มที่ {createdNumbers.volumeNo} โครงการที่ {createdNumbers.proposalNo}
+            </p>
+          )}
           <p className="mt-1 text-sm">รอความเห็นพัฒนากรและผลการพิจารณาของคณะกรรมการ กข.คจ. หมู่บ้าน</p>
         </div>
       </PageContainer>
@@ -122,10 +132,9 @@ export default function NewProposalPage() {
                 {selectedHousehold.village.subDistrict.district.province.name}
               </p>
             )}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <TextField label="เล่มที่" error={errors.volumeNo?.message} {...register("volumeNo")} />
-              <TextField label="โครงการที่" error={errors.proposalNo?.message} {...register("proposalNo")} />
-            </div>
+            <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+              ระบบจะกำหนดเล่มที่และโครงการที่ให้อัตโนมัติเมื่อบันทึกข้อมูล
+            </p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <TextField
                 label="อายุ (ปี)"

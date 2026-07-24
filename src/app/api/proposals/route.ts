@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getAllowedVillageIds, canAccessHouseholdRecord } from "@/lib/scope";
 import { ACCESS_DENIED_MESSAGE } from "@/lib/authz";
 import { notifyVillageLeadership } from "@/lib/notifications/notifyUsers";
+import { createProposalWithAutoNumber } from "@/lib/documentNumbering";
 
 // แบบฟอร์ม 1 (แบบเสนอโครงการ): เฉพาะครัวเรือน (HOUSEHOLD) เป็นผู้สร้างของตนเองเท่านั้น — เจ้าหน้าที่/กรรมการ
 // ห้ามยื่นแทนครัวเรือน (ป้องกันการปลอมแปลงข้อมูลการยื่นคำร้อง)
@@ -38,26 +39,29 @@ export async function POST(request: Request) {
   // จะอนุญาตฟิลด์เหล่านี้ก็ตาม (ใช้ schema เดียวกันสำหรับหน้าทบทวนข้อมูลในอนาคต) — ผู้เสนอโครงการ
   // (ครัวเรือน) ต้องไม่สามารถตั้งค่าความเห็นพัฒนากร/ผลอนุมัติของตนเองได้ ต้องผ่าน endpoint
   // /worker-opinion และ /approve ที่ตรวจสิทธิ์แยกต่างหากเท่านั้น
-  const proposal = await prisma.projectProposal.create({
-    data: {
-      householdId: data.householdId,
-      volumeNo: data.volumeNo,
-      proposalNo: data.proposalNo,
-      applicantAge: data.applicantAge,
-      occupation: data.occupation,
-      projectName: data.projectName,
-      totalAmount: data.totalAmount,
-      proposedDate: new Date(data.proposedDate),
-      items: {
-        create: data.items.map((item, index) => ({
-          itemNo: index + 1,
-          description: item.description,
-          amount: item.amount,
-        })),
+  // เล่มที่/โครงการที่ออกอัตโนมัติเสมอ (ไล่ลำดับจากน้อยไปมากทั่วทั้งระบบ ห้ามซ้ำ) — ครัวเรือนไม่ต้องกรอกเอง
+  const proposal = await createProposalWithAutoNumber(({ volumeNo, proposalNo }) =>
+    prisma.projectProposal.create({
+      data: {
+        householdId: data.householdId,
+        volumeNo,
+        proposalNo,
+        applicantAge: data.applicantAge,
+        occupation: data.occupation,
+        projectName: data.projectName,
+        totalAmount: data.totalAmount,
+        proposedDate: new Date(data.proposedDate),
+        items: {
+          create: data.items.map((item, index) => ({
+            itemNo: index + 1,
+            description: item.description,
+            amount: item.amount,
+          })),
+        },
       },
-    },
-    include: { items: true },
-  });
+      include: { items: true },
+    })
+  );
 
   // แจ้งเตือนพัฒนากรผู้รับผิดชอบตำบลและประธานกรรมการหมู่บ้าน ให้เห็นโครงการใหม่ที่รอพิจารณาทันที
   await notifyVillageLeadership(

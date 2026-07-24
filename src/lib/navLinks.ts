@@ -26,6 +26,7 @@ import {
   FolderOpen,
   Search,
   Shield,
+  HandCoins,
 } from "lucide-react";
 import { menusForRole } from "./dashboard";
 import { hasMinRole, canViewAuditLog, canViewStatisticsDashboard } from "./authz";
@@ -119,6 +120,18 @@ export function getNavLinks(user: CurrentUser): NavLink[] {
   if (role === "HOUSEHOLD") {
     return [
       { href: "/", label: "หน้าหลัก", icon: Home },
+      {
+        href: "/proposals",
+        label: "แบบเสนอโครงการ",
+        icon: FileText,
+        iconColor: "text-indigo-600 dark:text-indigo-300",
+      },
+      {
+        href: "/loan-requests",
+        label: "แบบขอยืมเงินทุน",
+        icon: HandCoins,
+        iconColor: "text-amber-600 dark:text-amber-300",
+      },
       {
         href: "/household-profile",
         label: "ข้อมูลครัวเรือนของฉัน (เล่มม่วง)",

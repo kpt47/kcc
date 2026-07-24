@@ -59,11 +59,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     },
   });
 
-  // แจ้งเตือนครัวเรือนเป้าหมายเมื่อคณะกรรมการอนุมัติแบบเสนอโครงการ (ฟอร์ม 1) แล้ว
+  // แจ้งเตือนครัวเรือนเป้าหมายเมื่อคณะกรรมการอนุมัติแบบเสนอโครงการ (ฟอร์ม 1) แล้ว พร้อมลิงก์ไปยื่นแบบขอยืมเงินทุน
+  // (ฟอร์ม 2) ต่อทันที — ฟอร์ม 2 จะดึงเล่มที่/โครงการที่/วงเงินที่อนุมัติจากโครงการนี้มาใส่ให้อัตโนมัติ
   if (data.committeeDecision === "approved") {
     const householdUser = await prisma.user.findFirst({ where: { householdId: proposal.householdId } });
     if (householdUser) {
-      await notifyUsers([householdUser.id], "แบบเสนอโครงการ (ฟอร์ม 1) ของท่านได้รับการอนุมัติแล้ว", "REMINDER");
+      await notifyUsers(
+        [householdUser.id],
+        `แบบเสนอโครงการ (ฟอร์ม 1) ของท่านได้รับการอนุมัติแล้ว วงเงิน ${data.committeeAmount?.toLocaleString("th-TH") ?? "-"} บาท กรุณายื่นแบบขอยืมเงินทุนต่อไป`,
+        "REMINDER",
+        `/loan-requests/new?proposalId=${updated.id}`
+      );
     }
   }
 

@@ -46,8 +46,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const updated = await prisma.loanRequest.update({
     where: { id: loanRequest.id },
     data: {
-      volumeNo: data.volumeNo,
-      requestNo: data.requestNo,
       applicantAge: data.applicantAge,
       occupation: data.occupation,
       requestedAmount: data.requestedAmount,

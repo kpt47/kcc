@@ -420,8 +420,6 @@ export const proposalSchema = z
       .number({ error: "กรุณาเลือกครัวเรือนเป้าหมาย" })
       .int()
       .positive("กรุณาเลือกครัวเรือนเป้าหมาย"),
-    volumeNo: z.string().optional(),
-    proposalNo: z.string().optional(),
     applicantAge: z
       .number({ error: "กรุณากรอกอายุ" })
       .int("อายุต้องเป็นจำนวนเต็ม")
@@ -467,8 +465,6 @@ export const proposalSchema = z
 
 export interface ProposalFormValues {
   householdId: number;
-  volumeNo?: string;
-  proposalNo?: string;
   applicantAge: number;
   occupation: string;
   projectName: string;
@@ -489,8 +485,6 @@ export interface ProposalFormValues {
 /** รูปแบบข้อมูลหลังผ่านการตรวจสอบแล้ว (ส่งให้ onSubmit) */
 export interface ProposalSubmitValues {
   householdId: number;
-  volumeNo?: string;
-  proposalNo?: string;
   applicantAge: number;
   occupation: string;
   projectName: string;
@@ -510,8 +504,6 @@ export interface ProposalSubmitValues {
 
 /** ครัวเรือนแก้ไขแบบเสนอโครงการของตนเอง — เฉพาะตอนยังไม่มีความเห็นพัฒนากร (ดู PATCH /api/proposals/[id]) */
 export const proposalSelfEditSchema = z.object({
-  volumeNo: z.string().optional(),
-  proposalNo: z.string().optional(),
   applicantAge: z.number().int("อายุต้องเป็นจำนวนเต็ม").min(1, "อายุไม่ถูกต้อง").max(120, "อายุไม่ถูกต้อง").optional(),
   occupation: z.string().trim().min(1, "กรุณากรอกอาชีพ").optional(),
   projectName: z.string().trim().min(1, "กรุณากรอกชื่อโครงการ").optional(),
@@ -522,7 +514,7 @@ export const proposalSelfEditSchema = z.object({
 export type ProposalSelfEditValues = z.infer<typeof proposalSelfEditSchema>;
 
 export const PROPOSAL_STEP_FIELDS = [
-  ["householdId", "volumeNo", "proposalNo", "applicantAge", "occupation"],
+  ["householdId", "applicantAge", "occupation"],
   ["projectName", "totalAmount", "items", "proposedDate"],
 ] as const;
 
@@ -536,8 +528,9 @@ export const loanRequestSchema = z
       .number({ error: "กรุณาเลือกครัวเรือนเป้าหมาย" })
       .int()
       .positive("กรุณาเลือกครัวเรือนเป้าหมาย"),
-    volumeNo: z.string().optional(),
-    requestNo: z.string().optional(),
+    // อ้างอิงแบบเสนอโครงการ (ฟอร์ม 1) ที่ได้รับการอนุมัติแล้ว — ถ้ามี จะคัดลอกเล่มที่/โครงการที่มาใช้แทนการออก
+    // เลขชุดใหม่ และจำกัดวงเงินขอยืมไม่ให้เกินวงเงินที่ประธานกรรมการอนุมัติ (ดู POST /api/loan-requests)
+    proposalId: z.number().int().positive().optional(),
     applicantAge: z
       .number({ error: "กรุณากรอกอายุ" })
       .int("อายุต้องเป็นจำนวนเต็ม")
@@ -578,8 +571,6 @@ export const loanRequestSchema = z
 
 /** ครัวเรือนแก้ไขแบบขอยืมเงินทุนของตนเอง — เฉพาะตอนยังไม่มีความเห็นพัฒนากร (ดู PATCH /api/loan-requests/[id]) */
 export const loanRequestSelfEditSchema = z.object({
-  volumeNo: z.string().optional(),
-  requestNo: z.string().optional(),
   applicantAge: z.number().int("อายุต้องเป็นจำนวนเต็ม").min(1, "อายุไม่ถูกต้อง").max(120, "อายุไม่ถูกต้อง").optional(),
   occupation: z.string().trim().min(1, "กรุณากรอกอาชีพ").optional(),
   requestedAmount: optionalNumber(
@@ -592,8 +583,7 @@ export type LoanRequestSelfEditValues = z.infer<typeof loanRequestSelfEditSchema
 
 export interface LoanRequestFormValues {
   householdId: number;
-  volumeNo?: string;
-  requestNo?: string;
+  proposalId?: number;
   applicantAge: number;
   occupation: string;
   requestedAmount: number;
@@ -614,8 +604,7 @@ export interface LoanRequestFormValues {
 /** รูปแบบข้อมูลหลังผ่านการตรวจสอบแล้ว (ส่งให้ onSubmit) */
 export interface LoanRequestSubmitValues {
   householdId: number;
-  volumeNo?: string;
-  requestNo?: string;
+  proposalId?: number;
   applicantAge: number;
   occupation: string;
   requestedAmount: number;
@@ -634,7 +623,7 @@ export interface LoanRequestSubmitValues {
 }
 
 export const LOAN_REQUEST_STEP_FIELDS = [
-  ["householdId", "volumeNo", "requestNo", "applicantAge", "occupation"],
+  ["householdId", "applicantAge", "occupation"],
   ["requestedAmount", "agreesToRegulations", "spouseConsentName", "requestDate"],
 ] as const;
 

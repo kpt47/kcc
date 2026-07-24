@@ -598,8 +598,8 @@ model ProjectProposal {
   id             Int             @id @default(autoincrement())
   householdId    Int
   household      TargetHousehold @relation(fields: [householdId], references: [id])
-  volumeNo       String? // เล่มที่
-  proposalNo     String? // โครงการที่
+  volumeNo       Int? // เล่มที่ (ออกอัตโนมัติ: 100 โครงการ/เล่ม คำนวณจาก proposalNo — ดู lib/documentNumbering.ts)
+  proposalNo     Int? // โครงการที่ (ออกอัตโนมัติ ไล่ลำดับจากน้อยไปมากทั่วทั้งระบบ ห้ามซ้ำ)
   applicantAge   Int // อายุผู้เสนอโครงการ ณ วันที่ยื่น (ปี)
   occupation     String // อาชีพ
   projectName    String // ชื่อโครงการที่เสนอ
@@ -622,7 +622,10 @@ model ProjectProposal {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items ProjectProposalItem[]
+  items        ProjectProposalItem[]
+  loanRequests LoanRequest[]
+
+  @@unique([proposalNo])
 }
 
 /// รายการย่อยของแบบเสนอโครงการ (ข้อ 2.1, 2.2, 2.3, ...)
@@ -640,8 +643,11 @@ model LoanRequest {
   id                Int             @id @default(autoincrement())
   householdId       Int
   household         TargetHousehold @relation(fields: [householdId], references: [id])
-  volumeNo          String? // เล่มที่
-  requestNo         String? // เลขที่
+  proposalId        Int? // อ้างอิงแบบเสนอโครงการ (ฟอร์ม 1) ที่ได้รับการอนุมัติแล้ว — ถ้ามี จะคัดลอกเล่มที่/เลขที่
+  // มาจากแบบเสนอโครงการนั้นแทนการออกเลขชุดใหม่ (ดู POST /api/loan-requests)
+  proposal          ProjectProposal? @relation(fields: [proposalId], references: [id])
+  volumeNo          Int? // เล่มที่ (ออกอัตโนมัติ หรือคัดลอกจากแบบเสนอโครงการที่อ้างอิง)
+  requestNo         Int? // เลขที่ (ออกอัตโนมัติ ไล่ลำดับจากน้อยไปมากทั่วทั้งระบบ ห้ามซ้ำ หรือคัดลอกจากแบบเสนอโครงการที่อ้างอิง)
   applicantAge      Int // อายุข้าพเจ้า ณ วันที่ยื่น (ปี)
   occupation        String // อาชีพ
   requestedAmount   Float // ขอยืมเงินทุนเป็นเงินทั้งสิ้น (บาท)
@@ -664,6 +670,9 @@ model LoanRequest {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([requestNo])
+  @@unique([proposalId])
 }
 
 /// วาระการประชุมและมติคณะกรรมการ กข.คจ. หมู่บ้าน (Meeting Records) — เก็บไฟล์แนบ (.pdf/.jpg/.png) เพื่อความโปร่งใส

@@ -70,6 +70,10 @@ export async function searchHouseholds(scope: VillageScope, filters: SmartSearch
   }
 
   const q = filters.q?.trim();
+  // เล่มที่/โครงการที่/เลขที่ เป็นตัวเลข (Int) แล้ว — ค้นหาแบบ contains ไม่ได้ ต้องเทียบเท่ากันตรงๆ และ
+  // ทำเฉพาะตอน q เป็นตัวเลขล้วนเท่านั้น (ไม่งั้น requestNo: undefined จะถูก Prisma ตัดทิ้งจนกลายเป็น
+  // จับคู่ครัวเรือนที่มีคำร้องใดๆ ก็ได้แบบไม่ตั้งใจ)
+  const qNumber = q && /^\d+$/.test(q) ? Number(q) : undefined;
   const where = {
     ...(villageIds !== "all" ? { villageId: { in: villageIds } } : {}),
     ...(filters.minIncome !== undefined || filters.maxIncome !== undefined
@@ -88,8 +92,12 @@ export async function searchHouseholds(scope: VillageScope, filters: SmartSearch
             { headLastName: { contains: q } },
             { village: { villageName: { contains: q } } },
             { loans: { some: { contractNo: { contains: q } } } },
-            { loanRequests: { some: { requestNo: { contains: q } } } },
-            { proposals: { some: { proposalNo: { contains: q } } } },
+            ...(qNumber !== undefined
+              ? [
+                  { loanRequests: { some: { requestNo: qNumber } } },
+                  { proposals: { some: { proposalNo: qNumber } } },
+                ]
+              : []),
           ],
         }
       : {}),
