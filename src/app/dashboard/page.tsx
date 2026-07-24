@@ -323,10 +323,11 @@ async function BigPictureView({ user }: { user: CurrentUser }) {
 
       <DataTableCard
         title={`Watchlist 5 พื้นที่เสี่ยงสูงสุด (ราย${WATCHLIST_LEVEL_LABEL[watchlistLevel]})`}
-        subtitle="เรียงตามอัตรา NPL สูงสุด"
+        subtitle="เรียงตามอัตรา NPL สูงสุด — คลิกหัวคอลัมน์เพื่อจัดเรียง"
         filename="npl-watchlist"
         emptyMessage="ไม่มีข้อมูลเพียงพอสำหรับจัดอันดับ"
         columnLabels={[WATCHLIST_LEVEL_LABEL[watchlistLevel], "อัตรา NPL", "หนี้คงค้าง", "ยอดค้างชำระ"]}
+        columnKeys={["areaName", "nplRatio", "totalOutstanding", "overdueAmount"]}
         rows={nplWatchlist.map((r) => ({
           cells: [r.areaName, `${(r.nplRatio * 100).toFixed(1)}%`, money(r.totalOutstanding), money(r.overdueAmount)],
           excel: {
@@ -335,6 +336,12 @@ async function BigPictureView({ user }: { user: CurrentUser }) {
             หนี้คงค้าง: r.totalOutstanding,
             ยอดค้างชำระ: r.overdueAmount,
           },
+          sortValues: {
+            areaName: r.areaName,
+            nplRatio: r.nplRatio,
+            totalOutstanding: r.totalOutstanding,
+            overdueAmount: r.overdueAmount,
+          },
         }))}
       />
 
@@ -342,10 +349,11 @@ async function BigPictureView({ user }: { user: CurrentUser }) {
 
       <DataTableCard
         title="หมู่บ้านที่มีผลประกอบการดีเด่น"
-        subtitle="เรียงตามอัตราหนี้ค้างชำระ (NPL) ต่ำสุด — Top 5"
+        subtitle="เรียงตามอัตราหนี้ค้างชำระ (NPL) ต่ำสุด — Top 5 (คลิกหัวคอลัมน์เพื่อจัดเรียง)"
         filename="top-performing-villages"
         emptyMessage="ยังไม่มีข้อมูลเพียงพอสำหรับจัดอันดับ"
         columnLabels={["หมู่บ้าน", "อัตราหนี้ค้างชำระ (NPL)", "ยอดหนี้คงค้าง"]}
+        columnKeys={["villageName", "nplRatio", "totalOutstanding"]}
         rows={data.topPerforming.map((r) => ({
           cells: [r.villageName, `${(r.nplRatio * 100).toFixed(1)}%`, money(r.totalOutstanding)],
           excel: {
@@ -353,15 +361,17 @@ async function BigPictureView({ user }: { user: CurrentUser }) {
             NPL_เปอร์เซ็นต์: Number((r.nplRatio * 100).toFixed(1)),
             ยอดหนี้คงค้าง: r.totalOutstanding,
           },
+          sortValues: { villageName: r.villageName, nplRatio: r.nplRatio, totalOutstanding: r.totalOutstanding },
         }))}
       />
 
       <DataTableCard
         title="หมู่บ้านที่มีปัญหาหนี้ค้างชำระสูงสุด (NPL)"
-        subtitle="เรียงตามอัตราหนี้ค้างชำระ (NPL) สูงสุด — Top 5"
+        subtitle="เรียงตามอัตราหนี้ค้างชำระ (NPL) สูงสุด — Top 5 (คลิกหัวคอลัมน์เพื่อจัดเรียง)"
         filename="top-problem-villages"
         emptyMessage="ไม่มีหมู่บ้านที่มีปัญหาหนี้ค้างชำระ"
         columnLabels={["หมู่บ้าน", "อัตราหนี้ค้างชำระ (NPL)", "ยอดค้างชำระ"]}
+        columnKeys={["villageName", "nplRatio", "overdueAmount"]}
         rows={data.topProblem.map((r) => ({
           cells: [r.villageName, `${(r.nplRatio * 100).toFixed(1)}%`, money(r.overdueAmount)],
           excel: {
@@ -369,6 +379,7 @@ async function BigPictureView({ user }: { user: CurrentUser }) {
             NPL_เปอร์เซ็นต์: Number((r.nplRatio * 100).toFixed(1)),
             ยอดค้างชำระ: r.overdueAmount,
           },
+          sortValues: { villageName: r.villageName, nplRatio: r.nplRatio, overdueAmount: r.overdueAmount },
         }))}
       />
     </div>

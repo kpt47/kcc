@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { exportRowsAsExcel } from "@/lib/export";
+import { useEffect, useRef, useState } from "react";
 import { SortableHeader } from "@/components/official-reports/SortableHeader";
+import { ExportMenu } from "./ExportMenu";
+import type { ScopedAreaOptions } from "@/lib/search";
 
 type AreaLevel = "village" | "subDistrict" | "district" | "province";
 
@@ -18,8 +19,6 @@ type AreaSummaryRow = {
   repaidThisYear: number;
 };
 
-type Option = { id: number; name: string };
-
 const LEVEL_LABELS: Record<AreaLevel, string> = {
   province: "จังหวัด",
   district: "อำเภอ",
@@ -33,10 +32,9 @@ const LEVEL_LABELS: Record<AreaLevel, string> = {
  * ตารางด้านล่างแสดงข้อมูล "ลูก" ของระดับที่เลือกลึกที่สุดเสมอ (ระดับคำนวณโดยฝั่งเซิร์ฟเวอร์ ดู resolveDrillLevel)
  */
 export function AreaSummaryCard() {
-  const [provinces, setProvinces] = useState<Option[]>([]);
-  const [districts, setDistricts] = useState<Option[]>([]);
-  const [subDistricts, setSubDistricts] = useState<Option[]>([]);
-  const [villages, setVillages] = useState<Option[]>([]);
+  // ตัวเลือกพื้นที่ทั้ง 4 ระดับ โหลดครั้งเดียวจาก /api/search/areas ซึ่งกรองตามขอบเขตสิทธิ์ของผู้ใช้ไว้แล้ว
+  // (ก่อนหน้านี้ดึงจาก /api/master-data/* ซึ่งไม่กรองสิทธิ์ ทำให้เห็นชื่อจังหวัด/อำเภอ/ตำบล/หมู่บ้านนอกเขตได้)
+  const [areaOptions, setAreaOptions] = useState<ScopedAreaOptions | null>(null);
 
   const [provinceId, setProvinceId] = useState("");
   const [districtId, setDistrictId] = useState("");
@@ -49,57 +47,35 @@ export function AreaSummaryCard() {
   const [level, setLevel] = useState<AreaLevel>("province");
   const [rows, setRows] = useState<AreaSummaryRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const captureRef = useRef<HTMLDivElement>(null);
 
-  // โหลดรายชื่อจังหวัดทั้งหมดครั้งเดียวตอนเปิดหน้า
+  // โหลดตัวเลือกพื้นที่ทั้งหมด (เฉพาะในขอบเขตสิทธิ์ของผู้ใช้) ครั้งเดียวตอนเปิดหน้า
   useEffect(() => {
-    fetch("/api/master-data/provinces")
+    fetch("/api/search/areas")
       .then((r) => r.json())
-      .then((data: Option[]) => setProvinces(data.map((p) => ({ id: p.id, name: p.name }))));
+      .then((data: ScopedAreaOptions) => setAreaOptions(data));
   }, []);
 
-  // เลือกจังหวัดแล้ว -> โหลดอำเภอในจังหวัดนั้น (และล้างตัวเลือกที่ลึกกว่าทั้งหมด)
-  useEffect(() => {
+  // กรองตัวเลือกแต่ละระดับตามที่เลือกไว้ในระดับสูงกว่า (ฝั่ง client ล้วนๆ — ข้อมูลตั้งต้นกรองสิทธิ์มาแล้ว)
+  const districts = areaOptions?.districts.filter((d) => !provinceId || d.provinceId === Number(provinceId)) ?? [];
+  const subDistricts = areaOptions?.subDistricts.filter((s) => !districtId || s.districtId === Number(districtId)) ?? [];
+  const villages = areaOptions?.villages.filter((v) => !subDistrictId || v.subDistrictId === Number(subDistrictId)) ?? [];
+
+  function handleProvinceChange(value: string) {
+    setProvinceId(value);
     setDistrictId("");
     setSubDistrictId("");
     setVillageId("");
-    setSubDistricts([]);
-    setVillages([]);
-    if (!provinceId) {
-      setDistricts([]);
-      return;
-    }
-    fetch(`/api/master-data/districts?provinceId=${provinceId}`)
-      .then((r) => r.json())
-      .then((data: Option[]) => setDistricts(data.map((d) => ({ id: d.id, name: d.name }))));
-  }, [provinceId]);
-
-  // เลือกอำเภอแล้ว -> โหลดตำบลในอำเภอนั้น
-  useEffect(() => {
+  }
+  function handleDistrictChange(value: string) {
+    setDistrictId(value);
     setSubDistrictId("");
     setVillageId("");
-    setVillages([]);
-    if (!districtId) {
-      setSubDistricts([]);
-      return;
-    }
-    fetch(`/api/master-data/sub-districts?districtId=${districtId}`)
-      .then((r) => r.json())
-      .then((data: Option[]) => setSubDistricts(data.map((s) => ({ id: s.id, name: s.name }))));
-  }, [districtId]);
-
-  // เลือกตำบลแล้ว -> โหลดหมู่บ้านในตำบลนั้น
-  useEffect(() => {
+  }
+  function handleSubDistrictChange(value: string) {
+    setSubDistrictId(value);
     setVillageId("");
-    if (!subDistrictId) {
-      setVillages([]);
-      return;
-    }
-    fetch(`/api/master-data/villages?subDistrictId=${subDistrictId}`)
-      .then((r) => r.json())
-      .then((data: { id: number; villageNo: string; villageName: string }[]) =>
-        setVillages(data.map((v) => ({ id: v.id, name: `หมู่ ${v.villageNo} บ้าน${v.villageName}` })))
-      );
-  }, [subDistrictId]);
+  }
 
   // ดึงข้อมูลสรุปตามตัวกรองที่ลึกที่สุดที่เลือกไว้ตอนนี้ (ระดับที่แสดงคำนวณโดยฝั่งเซิร์ฟเวอร์)
   useEffect(() => {
@@ -129,21 +105,18 @@ export function AreaSummaryCard() {
     }
   }
 
-  function handleExportExcel() {
-    exportRowsAsExcel(
-      rows.map((r) => ({
-        พื้นที่: r.areaName,
-        ครัวเรือนทั้งหมด: r.totalHouseholds,
-        ครัวเรือนเป้าหมาย: r.targetHouseholds,
-        ได้รับเงินยืม: r.householdsWithLoan,
-        ยอดเงินคงค้าง: r.outstandingBalance,
-        เงินในบัญชีธนาคาร: r.bankBalance,
-        เงินในมือ: r.cashOnHand,
-        รวมเงินที่มี: r.totalFund,
-        ได้รับคืนรอบปี: r.repaidThisYear,
-      })),
-      `dashboard-area-summary-${level}`
-    );
+  function excelRows() {
+    return rows.map((r) => ({
+      พื้นที่: r.areaName,
+      ครัวเรือนทั้งหมด: r.totalHouseholds,
+      ครัวเรือนเป้าหมาย: r.targetHouseholds,
+      ได้รับเงินยืม: r.householdsWithLoan,
+      ยอดเงินคงค้าง: r.outstandingBalance,
+      เงินในบัญชีธนาคาร: r.bankBalance,
+      เงินในมือ: r.cashOnHand,
+      รวมเงินที่มี: r.totalFund,
+      ได้รับคืนรอบปี: r.repaidThisYear,
+    }));
   }
 
   const areaLabel = LEVEL_LABELS[level];
@@ -155,14 +128,7 @@ export function AreaSummaryCard() {
           <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">สรุปภาวะหนี้สินราย{areaLabel}</h3>
           <p className="text-xs text-slate-500 dark:text-slate-400">เลือกจังหวัด → อำเภอ → ตำบล → หมู่บ้านตามลำดับ แล้วคลิกหัวคอลัมน์เพื่อจัดเรียง</p>
         </div>
-        <button
-          type="button"
-          onClick={handleExportExcel}
-          disabled={rows.length === 0}
-          className="inline-flex min-h-9 items-center rounded-lg border border-emerald-300 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
-        >
-          Export Excel (.xlsx)
-        </button>
+        <ExportMenu targetRef={captureRef} excelRows={excelRows} filename={`dashboard-area-summary-${level}`} />
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
@@ -170,11 +136,11 @@ export function AreaSummaryCard() {
           <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">จังหวัด</label>
           <select
             value={provinceId}
-            onChange={(e) => setProvinceId(e.target.value)}
+            onChange={(e) => handleProvinceChange(e.target.value)}
             className="min-h-10 w-40 rounded-lg border border-slate-300 bg-white px-2 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
           >
             <option value="">-- ทั้งหมด --</option>
-            {provinces.map((p) => (
+            {areaOptions?.provinces.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -185,7 +151,7 @@ export function AreaSummaryCard() {
           <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">อำเภอ</label>
           <select
             value={districtId}
-            onChange={(e) => setDistrictId(e.target.value)}
+            onChange={(e) => handleDistrictChange(e.target.value)}
             disabled={!provinceId}
             className="min-h-10 w-40 rounded-lg border border-slate-300 bg-white px-2 text-sm disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900 dark:disabled:text-slate-600"
           >
@@ -201,7 +167,7 @@ export function AreaSummaryCard() {
           <label className="mb-1 block text-xs font-semibold text-slate-500 dark:text-slate-400">ตำบล</label>
           <select
             value={subDistrictId}
-            onChange={(e) => setSubDistrictId(e.target.value)}
+            onChange={(e) => handleSubDistrictChange(e.target.value)}
             disabled={!districtId}
             className="min-h-10 w-40 rounded-lg border border-slate-300 bg-white px-2 text-sm disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:disabled:bg-slate-900 dark:disabled:text-slate-600"
           >
@@ -224,7 +190,7 @@ export function AreaSummaryCard() {
             <option value="">{subDistrictId ? "-- ทั้งหมด --" : "-- เลือกตำบลก่อน --"}</option>
             {villages.map((v) => (
               <option key={v.id} value={v.id}>
-                {v.name}
+                หมู่ {v.villageNo} บ้าน{v.villageName}
               </option>
             ))}
           </select>
@@ -238,7 +204,7 @@ export function AreaSummaryCard() {
         />
       </div>
 
-      <div className="overflow-x-auto">
+      <div ref={captureRef} className="overflow-x-auto bg-white dark:bg-slate-900">
         <table className="w-full min-w-max text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:text-slate-400">
