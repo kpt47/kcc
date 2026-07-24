@@ -49,10 +49,13 @@ function IdeaCard({ idea, highlighted }: { idea: CareerIdea; highlighted?: boole
 export default async function CareerIdeasPage() {
   const user = await requireUser();
 
-  // รวบรวม "สัญญาณ" อาชีพ/โครงการปัจจุบันของครัวเรือน (ถ้าบัญชีนี้ผูกกับครัวเรือนเป้าหมาย) เพื่อไฮไลต์ไอเดียที่ตรงกับตัวเอง
+  // รวบรวม "สัญญาณ" อาชีพ/ความสามารถพิเศษ/โครงการปัจจุบันของครัวเรือน (ถ้าบัญชีนี้ผูกกับครัวเรือนเป้าหมาย)
+  // เพื่อไฮไลต์ไอเดียที่ตรงกับตัวเอง — ดึงทั้งจากทะเบียนครัวเรือนเป้าหมาย (อาชีพ+ความสามารถพิเศษที่ลงทะเบียนไว้)
+  // และจากอาชีพที่เคยกรอกในคำร้องต่างๆ (อาจต่างจากที่ลงทะเบียนไว้ ถ้าเปลี่ยนอาชีพภายหลัง)
   const signals: (string | null | undefined)[] = [];
   if (user.householdId) {
-    const [profile, loans, proposals, loanRequests] = await Promise.all([
+    const [household, profile, loans, proposals, loanRequests] = await Promise.all([
+      prisma.targetHousehold.findUnique({ where: { id: user.householdId }, select: { occupation: true, specialSkills: true } }),
       prisma.householdProfile.findFirst({ where: { userId: user.id }, select: { occupation: true } }),
       prisma.loan.findMany({ where: { householdId: user.householdId }, select: { occupation: true } }),
       prisma.projectProposal.findMany({
@@ -62,6 +65,8 @@ export default async function CareerIdeasPage() {
       prisma.loanRequest.findMany({ where: { householdId: user.householdId }, select: { occupation: true } }),
     ]);
     signals.push(
+      household?.occupation,
+      household?.specialSkills,
       profile?.occupation,
       ...loans.map((l) => l.occupation),
       ...proposals.flatMap((p) => [p.occupation, p.projectName]),

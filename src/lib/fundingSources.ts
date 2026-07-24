@@ -11,6 +11,7 @@ export type FundingInfo = {
   description: string;
   url: string;
   category: FundingSourceCategory;
+  keywords: string[]; // ใช้จับคู่กับอาชีพ/ความสามารถพิเศษของครัวเรือน (เทียบแบบ substring ไม่สนตัวพิมพ์เล็ก-ใหญ่)
 };
 
 export const FUNDING_INFO: FundingInfo[] = [
@@ -21,6 +22,7 @@ export const FUNDING_INFO: FundingInfo[] = [
     description: "กองทุนหมุนเวียนประจำหมู่บ้าน ให้สมาชิกกู้ยืมเพื่อประกอบอาชีพและพัฒนาคุณภาพชีวิต ติดต่อผ่านคณะกรรมการกองทุนหมู่บ้านของตนเอง หรือสอบถามที่สำนักงานพัฒนาชุมชนอำเภอ",
     url: "https://www.villagefund.or.th/",
     category: "community_fund",
+    keywords: [],
   },
   {
     key: "savings-group",
@@ -29,14 +31,16 @@ export const FUNDING_INFO: FundingInfo[] = [
     description: "การรวมกลุ่มออมเงินสม่ำเสมอของสมาชิกในชุมชน เพื่อเป็นทุนให้กู้ยืมไปประกอบอาชีพหรือใช้จ่ายยามจำเป็น สมัครผ่านกลุ่มออมทรัพย์ในหมู่บ้าน/ตำบลของตนเอง",
     url: "https://fund.cdd.go.th/",
     category: "cooperative",
+    keywords: [],
   },
   {
     key: "women-fund",
     name: "กองทุนพัฒนาบทบาทสตรี",
     org: "กรมการพัฒนาชุมชน กระทรวงมหาดไทย",
     description: "แหล่งเงินทุนหมุนเวียนดอกเบี้ยต่ำสำหรับกลุ่มสตรีเพื่อพัฒนาอาชีพและสร้างรายได้ ยื่นคำขอผ่านสำนักงานพัฒนาชุมชนอำเภอ/จังหวัด",
-    url: "https://www.cdd.go.th/our-services/women-empowerment-fund",
+    url: "https://cddadg.cdd.go.th/th/content/category/detail/id/68/iid/901",
     category: "community_fund",
+    keywords: ["หญิง", "สตรี", "แม่บ้าน"],
   },
   {
     key: "mae-fah-luang-fund",
@@ -45,6 +49,7 @@ export const FUNDING_INFO: FundingInfo[] = [
     description: "กองทุนหมู่บ้านเพื่อป้องกันและแก้ไขปัญหายาเสพติดควบคู่การพัฒนาคุณภาพชีวิต บริหารโดยคณะกรรมการกองทุนแม่ของแผ่นดินประจำหมู่บ้าน สอบถามที่สำนักงานพัฒนาชุมชนอำเภอ",
     url: "https://www.maefahluang.org/",
     category: "community_fund",
+    keywords: [],
   },
   {
     key: "community-financial-institute",
@@ -53,6 +58,7 @@ export const FUNDING_INFO: FundingInfo[] = [
     description: "การรวมกลุ่มออมทรัพย์/กองทุนของหมู่บ้านให้เป็นสถาบันเดียว บริหารจัดการเงินทุนของชุมชนแบบครบวงจร ทั้งรับฝาก-ถอน-ให้กู้ยืม",
     url: "https://fund.cdd.go.th/",
     category: "community_fund",
+    keywords: [],
   },
   {
     key: "community-fund-management-center",
@@ -61,6 +67,7 @@ export const FUNDING_INFO: FundingInfo[] = [
     description: "ศูนย์กลางบูรณาการกองทุนต่างๆ ในหมู่บ้าน (กข.คจ./กองทุนหมู่บ้าน/กลุ่มออมทรัพย์ ฯลฯ) ให้บริหารจัดการอย่างมีธรรมาภิบาลและเชื่อมโยงกัน",
     url: "https://fund.cdd.go.th/",
     category: "community_fund",
+    keywords: [],
   },
   {
     key: "community-enterprise",
@@ -69,6 +76,7 @@ export const FUNDING_INFO: FundingInfo[] = [
     description: "การรวมกลุ่มผลิต/แปรรูปสินค้าและบริการของชุมชน จดทะเบียนเพื่อรับการส่งเสริมและสิทธิประโยชน์ ค้นหากลุ่มที่จดทะเบียนแล้วในพื้นที่ผ่านระบบสารสนเทศวิสาหกิจชุมชน",
     url: "https://smce.doae.go.th/",
     category: "enterprise",
+    keywords: ["วิสาหกิจชุมชน", "แปรรูป", "หัตถกรรม", "งานฝีมือ", "ทอผ้า", "จักสาน"],
   },
   {
     key: "otop",
@@ -77,6 +85,7 @@ export const FUNDING_INFO: FundingInfo[] = [
     description: "แหล่งจำหน่ายสินค้า/ผลิตภัณฑ์ชุมชนที่ขึ้นทะเบียน OTOP แล้ว เป็นช่องทางสร้างรายได้และต่อยอดอาชีพให้ครัวเรือนเป้าหมาย",
     url: "https://www.otoptoday.com/",
     category: "otop",
+    keywords: ["หัตถกรรม", "งานฝีมือ", "otop", "ทอผ้า", "จักสาน", "ผลิตภัณฑ์"],
   },
   {
     key: "community-market",
@@ -85,6 +94,7 @@ export const FUNDING_INFO: FundingInfo[] = [
     description: "พื้นที่จำหน่ายสินค้าเกษตร/OTOP/งานฝีมือของคนในชุมชน เป็นช่องทางระบายผลผลิตและสร้างรายได้เสริมให้ครัวเรือนเป้าหมาย",
     url: "https://www.cdd.go.th/",
     category: "market",
+    keywords: ["ค้าขาย", "ขายของ", "พ่อค้า", "แม่ค้า", "เกษตร", "ปลูกผัก"],
   },
   {
     key: "cooperative",
@@ -93,6 +103,7 @@ export const FUNDING_INFO: FundingInfo[] = [
     description: "สหกรณ์ให้บริการเงินกู้ รับฝากเงิน และรวบรวมผลผลิตแก่สมาชิก สอบถามสหกรณ์ในพื้นที่ได้ที่สำนักงานสหกรณ์จังหวัด",
     url: "https://www.cpd.go.th/",
     category: "cooperative",
+    keywords: ["เกษตร", "ทำนา", "ทำไร่", "ทำสวน", "ปลูก"],
   },
   {
     key: "baac",
@@ -101,6 +112,7 @@ export const FUNDING_INFO: FundingInfo[] = [
     description: "สินเชื่อเพื่อเกษตรกรและสถาบันเกษตรกร ครอบคลุมเงินทุนหมุนเวียน การลงทุน และแก้ไขปัญหาหนี้สิน มีสาขาครอบคลุมเกือบทุกอำเภอ",
     url: "https://www.baac.or.th/",
     category: "bank",
+    keywords: ["เกษตร", "ทำนา", "ทำไร่", "ทำสวน", "ปศุสัตว์", "เลี้ยงสัตว์", "เลี้ยงปลา", "ประมง"],
   },
   {
     key: "gsb",
@@ -109,6 +121,7 @@ export const FUNDING_INFO: FundingInfo[] = [
     description: "สินเชื่อประชาชนสุขใจ/สินเชื่อธนาคารประชาชน สำหรับตั้งตัวสร้างอาชีพหรือเป็นทุนหมุนเวียน ไม่ต้องมีรายได้ประจำ",
     url: "https://www.gsb.or.th/",
     category: "bank",
+    keywords: ["ค้าขาย", "ขายของ", "อาชีพอิสระ", "รับจ้าง"],
   },
   {
     key: "ibank",
@@ -117,5 +130,23 @@ export const FUNDING_INFO: FundingInfo[] = [
     description: "สินเชื่อและบริการทางการเงินตามหลักศาสนาอิสลาม (ปลอดดอกเบี้ย) สำหรับประชาชนทั่วไปและผู้ประกอบอาชีพอิสระ เหมาะกับครัวเรือนที่ต้องการแหล่งทุนตามหลักศาสนา",
     url: "https://www.ibank.co.th/",
     category: "islamic_bank",
+    keywords: ["มุสลิม", "อิสลาม", "อาชีพอิสระ"],
   },
 ];
+
+/** จับคู่แหล่งทุนกับ "สัญญาณ" อาชีพ/ความสามารถพิเศษ/เพศของครัวเรือน (เทียบแบบเดียวกับ matchCareerIdeas) */
+export function matchFundingInfo(signals: (string | null | undefined)[]): { matched: FundingInfo[]; others: FundingInfo[] } {
+  const normalizedSignals = signals.filter((s): s is string => Boolean(s && s.trim())).map((s) => s.toLowerCase());
+  const matched: FundingInfo[] = [];
+  const others: FundingInfo[] = [];
+
+  for (const info of FUNDING_INFO) {
+    const isMatch = info.keywords.some((keyword) => {
+      const kw = keyword.toLowerCase();
+      return normalizedSignals.some((sig) => sig.includes(kw) || kw.includes(sig));
+    });
+    (isMatch ? matched : others).push(info);
+  }
+
+  return { matched, others };
+}

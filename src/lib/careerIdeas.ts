@@ -83,16 +83,6 @@ export const CAREER_IDEAS: CareerIdea[] = [
     sourceUrl: "https://cep.cdd.go.th/th/content/page/index/id/1336",
   },
   {
-    id: "online-selling-starter-kbank",
-    title: "เริ่มขายของออนไลน์สำหรับมือใหม่ รู้ก่อน รวยก่อน",
-    summary:
-      "คู่มือเริ่มต้นขายของออนไลน์ฉบับมือใหม่ ตั้งแต่เลือกสินค้า เปิดร้านบนแพลตฟอร์มต่างๆ จนถึงการตลาดเบื้องต้น",
-    category: "ค้าขาย/ออนไลน์",
-    keywords: ["ค้าขาย", "ขายของ", "พ่อค้า", "แม่ค้า", "ออนไลน์"],
-    sourceName: "ธนาคารกสิกรไทย",
-    sourceUrl: "https://www.kasikornbank.com/th/kbiz/article/pages/guide-for-online-selling-starter.aspx",
-  },
-  {
     id: "online-business-krungsri",
     title: "วิธีปั้นธุรกิจขายของออนไลน์ สำหรับมือใหม่ (ฉบับอัปเดต)",
     summary:

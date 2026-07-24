@@ -1,13 +1,15 @@
-import { ExternalLink, MapPin, Navigation } from "lucide-react";
+import { ExternalLink, MapPin, Navigation, Sparkles } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { FundingSourcesMap } from "@/components/funding-sources/FundingSourcesMap";
 import { requireUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { FUNDING_INFO } from "@/lib/fundingSources";
+import { FUNDING_INFO, matchFundingInfo } from "@/lib/fundingSources";
 import { fetchNearbyPlaces } from "@/lib/fundingSourcesNearby";
 import type { NearbyPlace } from "@/lib/fundingSourcesTypes";
 import { VILLAGE_ADDRESS_INCLUDE, villageAddress } from "@/lib/geo";
 import { googleMapsSearchUrl, googleMapsDirectionsUrl } from "@/lib/googleMaps";
+
+const GENDER_SIGNAL_TEXT: Record<string, string> = { MALE: "ชาย", FEMALE: "หญิง" };
 
 // หน้า "แหล่งทุนใกล้ฉัน" — เฉพาะครัวเรือนเป้าหมาย (เข้าถึงได้ผ่านเมนูใน src/lib/navLinks.ts เท่านั้น)
 // ส่วนแผนที่ (FundingSourcesMap) ดึงพิกัดจริงของ "กองทุนหมู่บ้าน กข.คจ." อื่นในระบบ (มีอยู่แล้ว ไม่ต้องพึ่ง API
@@ -45,13 +47,21 @@ function FundingInfoCard({
   info,
   areaQuery,
   nearbyMatches,
+  highlighted,
 }: {
   info: (typeof FUNDING_INFO)[number];
   areaQuery: string;
   nearbyMatches: NearbyPlace[];
+  highlighted?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+    <div
+      className={`flex flex-col gap-2 rounded-2xl border p-4 ${
+        highlighted
+          ? "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40"
+          : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+      }`}
+    >
       <p className="text-base font-bold text-slate-900 dark:text-slate-100">{info.name}</p>
       <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{info.org}</p>
       <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">{info.description}</p>
@@ -109,7 +119,7 @@ export default async function FundingSourcesPage() {
 
   const household = await prisma.targetHousehold.findUnique({
     where: { id: user.householdId },
-    select: { village: { include: VILLAGE_ADDRESS_INCLUDE } },
+    select: { occupation: true, specialSkills: true, gender: true, village: { include: VILLAGE_ADDRESS_INCLUDE } },
   });
   const address = household ? villageAddress(household.village) : null;
   const areaQuery = address ? `ตำบล${address.subDistrictName} อำเภอ${address.districtName} จังหวัด${address.provinceName}` : "";
@@ -123,6 +133,13 @@ export default async function FundingSourcesPage() {
     placesByCategory.set(p.category, list);
   }
 
+  // จับคู่แหล่งทุนที่ตรงกับอาชีพ/ความสามารถพิเศษ/เพศของครัวเรือน (ดู lib/fundingSources.ts) เพื่อไฮไลต์ก่อน
+  const { matched, others } = matchFundingInfo([
+    household?.occupation,
+    household?.specialSkills,
+    household?.gender ? GENDER_SIGNAL_TEXT[household.gender] : null,
+  ]);
+
   return (
     <PageContainer title="แหล่งทุนใกล้ฉัน" subtitle="แหล่งเงินทุนและกองทุนต่างๆ ในรัศมีประมาณ 40 กิโลเมตรรอบหมู่บ้านของคุณ">
       <div className="flex items-start gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-800 dark:bg-sky-950/40">
@@ -135,10 +152,30 @@ export default async function FundingSourcesPage() {
 
       <FundingSourcesMap />
 
+      {matched.length > 0 && (
+        <section className="flex flex-col gap-3">
+          <h2 className="flex items-center gap-2 text-base font-bold text-slate-900 dark:text-slate-100">
+            <Sparkles className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+            แนะนำสำหรับคุณ (ตรงกับอาชีพ/ความสามารถพิเศษของคุณ)
+          </h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {matched.map((info) => (
+              <FundingInfoCard
+                key={info.key}
+                info={info}
+                areaQuery={areaQuery}
+                nearbyMatches={(placesByCategory.get(info.category) ?? []).slice(0, 3)}
+                highlighted
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className="flex flex-col gap-3">
         <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">แหล่งทุนอื่นๆ ที่น่าสนใจ</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {FUNDING_INFO.map((info) => (
+          {others.map((info) => (
             <FundingInfoCard
               key={info.key}
               info={info}
