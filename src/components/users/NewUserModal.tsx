@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { HouseholdSelect } from "@/components/form/HouseholdSelect";
+import { HouseholdSelect, type HouseholdOption } from "@/components/form/HouseholdSelect";
 import { AddressCombobox, type AddressOption } from "@/components/form/AddressCombobox";
 import { ThaiDateField } from "@/components/form/ThaiDateField";
+import { calculateAge } from "@/lib/thai";
 import type { GlobalRole } from "@/generated/prisma/client";
 
 type AreaOption = { id: number; label: string };
@@ -71,6 +72,21 @@ export function NewUserModal() {
       .then((r) => r.json())
       .then((data) => setAreas(data));
   }, [open]);
+
+  // เลือกครัวเรือนเป้าหมายแล้ว: เติมชื่อ/นามสกุล/อายุ (คำนวณจากวันเกิด)/อาชีพ/ผู้ให้ความยินยอม/ความสัมพันธ์
+  // ให้อัตโนมัติจากข้อมูลที่มีอยู่แล้วในทะเบียนครัวเรือน — ยกเว้นชื่อผู้ใช้/รหัสผ่าน/อีเมล ยังต้องกรอกเองเสมอ
+  // (ยังแก้ไขทับค่าที่เติมมาได้ตามปกติ เผื่อครัวเรือนยังไม่มีข้อมูลบางส่วน หรือข้อมูลเปลี่ยนไปแล้ว)
+  function handleSelectHousehold(household: HouseholdOption | undefined) {
+    setHouseholdId(household?.id);
+    if (!household) return;
+    setFirstName(household.headFirstName);
+    setLastName(household.headLastName);
+    const computedAge = calculateAge(household.birthDate);
+    if (computedAge !== undefined) setAge(String(computedAge));
+    if (household.occupation) setOccupation(household.occupation);
+    if (household.consentPersonName) setConsentPersonName(household.consentPersonName);
+    if (household.consentRelation) setConsentRelation(household.consentRelation);
+  }
 
   function resetForm() {
     setUsername("");
@@ -336,6 +352,7 @@ export function NewUserModal() {
                   label="ผูกกับครัวเรือนเป้าหมาย (ถ้ามี)"
                   value={householdId}
                   onChange={setHouseholdId}
+                  onSelectHousehold={handleSelectHousehold}
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <input

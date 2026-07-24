@@ -33,9 +33,23 @@ export async function GET() {
           },
         },
       },
+      // ดึงบัญชีผู้ใช้งาน HOUSEHOLD ล่าสุดที่เคยผูกกับครัวเรือนนี้ (ถ้ามี — รวมที่ถูกระงับแล้วด้วย) เพื่อดึง
+      // ชื่อผู้ให้ความยินยอม/ความสัมพันธ์เดิมมาเติมอัตโนมัติตอนเปิดบัญชีใหม่ให้ครัวเรือนเดียวกัน (ดู NewUserModal)
+      users: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { householdProfile: { select: { consentPersonName: true, consentRelation: true } } },
+      },
     },
   });
-  return NextResponse.json(households);
+
+  const result = households.map(({ users, ...h }) => ({
+    ...h,
+    consentPersonName: users[0]?.householdProfile?.consentPersonName ?? null,
+    consentRelation: users[0]?.householdProfile?.consentRelation ?? null,
+  }));
+
+  return NextResponse.json(result);
 }
 
 export async function POST(request: Request) {

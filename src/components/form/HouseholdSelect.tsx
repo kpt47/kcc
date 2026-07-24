@@ -12,6 +12,8 @@ export type HouseholdOption = {
   houseNo: string | null;
   birthDate: string | null;
   occupation: string | null;
+  consentPersonName: string | null;
+  consentRelation: string | null;
   village: {
     villageName: string;
     villageNo: string;
