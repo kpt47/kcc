@@ -11,6 +11,7 @@ import {
   FileText,
   CalendarCheck,
   MapPin,
+  Briefcase,
   BarChart3,
   UserCog,
   Settings,
@@ -139,6 +140,12 @@ export function getNavLinks(user: CurrentUser): NavLink[] {
         label: "แหล่งทุนใกล้ฉัน",
         icon: MapPin,
         iconColor: "text-sky-600 dark:text-sky-300",
+      },
+      {
+        href: "/side-jobs",
+        label: "งานเสริมเพิ่มรายได้",
+        icon: Briefcase,
+        iconColor: "text-emerald-600 dark:text-emerald-300",
       },
     ];
   }
