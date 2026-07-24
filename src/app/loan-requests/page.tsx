@@ -41,6 +41,16 @@ export default async function LoanRequestsPage() {
   const showRiskAssessment = canViewRiskAssessment(user);
   const showManageAction = canManageProposalOrLoanRequestRecord(user);
 
+  // ตามขั้นตอน กข.คจ.: ครัวเรือนต้องมีแบบเสนอโครงการที่อนุมัติแล้วและยังไม่ได้ใช้ยื่นก่อน จึงจะยื่นแบบขอยืมเงินทุน
+  // ใหม่ได้ — เช็คไว้ที่นี่เพื่อไม่ให้ปุ่ม "+" พาไปเจอทางตันที่หน้าฟอร์ม (ดู POST /api/loan-requests สำหรับการ
+  // บังคับใช้จริงฝั่ง server)
+  const hasEligibleProposal =
+    user.role === "HOUSEHOLD" && user.householdId
+      ? (await prisma.projectProposal.count({
+          where: { householdId: user.householdId, committeeDecision: "approved", loanRequests: { none: {} } },
+        })) > 0
+      : true;
+
   // เติมชื่อผู้ใช้ปัจจุบันอัตโนมัติในช่อง "ชื่อพัฒนากรผู้รับผิดชอบ"/"ชื่อประธานคณะกรรมการ" (คำนำหน้า+ชื่อ+เว้น
   // 2 ตัวอักษร+นามสกุล) — ไม่ต้องพิมพ์ชื่อตัวเองซ้ำทุกครั้งที่ให้ความเห็น/พิจารณาอนุมัติ (ยังแก้ไขทับได้ตามปกติ)
   const [ownCommitteeProfile, ownOfficialProfile] = await Promise.all([
@@ -54,13 +64,28 @@ export default async function LoanRequestsPage() {
     <PageContainer title="แบบขอยืมเงินทุน" subtitle="รายการแบบขอยืมเงินทุนของครัวเรือนเป้าหมายทั้งหมด">
       <div className="flex items-center justify-between gap-3">
         <span />
-        <Link
-          href="/loan-requests/new"
-          className="inline-flex min-h-11 items-center rounded-full bg-amber-600 px-3.5 text-sm font-semibold text-white"
-        >
-          + แบบขอยืมเงินทุนใหม่
-        </Link>
+        {hasEligibleProposal ? (
+          <Link
+            href="/loan-requests/new"
+            className="inline-flex min-h-11 items-center rounded-full bg-amber-600 px-3.5 text-sm font-semibold text-white"
+          >
+            + แบบขอยืมเงินทุนใหม่
+          </Link>
+        ) : (
+          <Link
+            href="/proposals/new"
+            className="inline-flex min-h-11 items-center rounded-full border border-amber-300 px-3.5 text-sm font-semibold text-amber-700 hover:bg-amber-50"
+            title="ต้องมีแบบเสนอโครงการที่ได้รับการอนุมัติก่อน จึงจะยื่นแบบขอยืมเงินทุนได้"
+          >
+            + ยื่นแบบเสนอโครงการก่อน
+          </Link>
+        )}
       </div>
+      {!hasEligibleProposal && user.role === "HOUSEHOLD" && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          ต้องมีแบบเสนอโครงการที่ได้รับการอนุมัติจากคณะกรรมการ กข.คจ. หมู่บ้านก่อน จึงจะยื่นแบบขอยืมเงินทุนได้
+        </p>
+      )}
 
       {requests.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">

@@ -6,7 +6,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { getAllowedVillageIds, canAccessHouseholdRecord } from "@/lib/scope";
 import { ACCESS_DENIED_MESSAGE } from "@/lib/authz";
 import { notifyVillageLeadership } from "@/lib/notifications/notifyUsers";
-import { createLoanRequestWithAutoNumber } from "@/lib/documentNumbering";
 import { Prisma } from "@/generated/prisma/client";
 
 // แบบฟอร์ม 2 (แบบขอยืมเงินทุน): เฉพาะครัวเรือน (HOUSEHOLD) เป็นผู้สร้างของตนเองเท่านั้น — เจ้าหน้าที่/กรรมการ
@@ -45,45 +44,56 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: { formErrors: ["คุณไม่มีสิทธิ์ยื่นขอยืมเงินให้ครัวเรือนนี้"] } }, { status: 403 });
   }
 
-  // ถ้าอ้างอิงแบบเสนอโครงการที่อนุมัติแล้ว (ยื่นผ่านลิงก์ในการแจ้งเตือน) ให้คัดลอกเล่มที่/โครงการที่มาใช้แทน
-  // การออกเลขชุดใหม่ และวงเงินขอยืมต้องไม่เกินวงเงินที่ประธานกรรมการอนุมัติไว้ในแบบเสนอโครงการนั้น
-  let linkedProposal: { id: number; volumeNo: number | null; proposalNo: number | null; committeeAmount: number | null } | null = null;
-  if (data.proposalId !== undefined) {
-    const proposal = await prisma.projectProposal.findUnique({
-      where: { id: data.proposalId },
-      include: { loanRequests: { select: { id: true } } },
-    });
-    if (!proposal || proposal.householdId !== data.householdId) {
-      return NextResponse.json({ error: { formErrors: ["ไม่พบแบบเสนอโครงการที่อ้างอิง"] } }, { status: 404 });
-    }
-    if (proposal.committeeDecision !== "approved") {
-      return NextResponse.json(
-        { error: { formErrors: ["แบบเสนอโครงการที่อ้างอิงยังไม่ได้รับการอนุมัติ"] } },
-        { status: 409 }
-      );
-    }
-    if (proposal.loanRequests.length > 0) {
-      return NextResponse.json(
-        { error: { formErrors: ["แบบเสนอโครงการนี้ถูกใช้ยื่นแบบขอยืมเงินทุนไปแล้ว"] } },
-        { status: 409 }
-      );
-    }
-    if (proposal.committeeAmount != null && data.requestedAmount > proposal.committeeAmount) {
-      return NextResponse.json(
-        {
-          error: {
-            fieldErrors: {
-              requestedAmount: [
-                `วงเงินขอยืมต้องไม่เกินวงเงินที่ประธานกรรมการอนุมัติ (${proposal.committeeAmount.toLocaleString("th-TH")} บาท)`,
-              ],
-            },
+  // ตามขั้นตอน กข.คจ.: ครัวเรือนต้องมี "แบบเสนอโครงการ" ที่ได้รับการอนุมัติแล้วก่อน จึงจะยื่น "แบบขอยืมเงินทุน"
+  // ได้ — บังคับต้องอ้างอิง proposalId เสมอ (ไม่มีทางยื่นแบบขอยืมเงินทุนแบบไม่อ้างอิงได้อีกต่อไป) คัดลอกเล่มที่/
+  // โครงการที่มาใช้แทนการออกเลขชุดใหม่ และวงเงินขอยืมต้องไม่เกินวงเงินที่ประธานกรรมการอนุมัติไว้ในแบบเสนอโครงการนั้น
+  if (data.proposalId === undefined) {
+    return NextResponse.json(
+      {
+        error: {
+          formErrors: [
+            "ต้องมีแบบเสนอโครงการที่ได้รับการอนุมัติจากคณะกรรมการ กข.คจ. หมู่บ้านก่อน จึงจะยื่นแบบขอยืมเงินทุนได้",
+          ],
+        },
+      },
+      { status: 400 }
+    );
+  }
+
+  const proposal = await prisma.projectProposal.findUnique({
+    where: { id: data.proposalId },
+    include: { loanRequests: { select: { id: true } } },
+  });
+  if (!proposal || proposal.householdId !== data.householdId) {
+    return NextResponse.json({ error: { formErrors: ["ไม่พบแบบเสนอโครงการที่อ้างอิง"] } }, { status: 404 });
+  }
+  if (proposal.committeeDecision !== "approved") {
+    return NextResponse.json(
+      { error: { formErrors: ["แบบเสนอโครงการที่อ้างอิงยังไม่ได้รับการอนุมัติ"] } },
+      { status: 409 }
+    );
+  }
+  if (proposal.loanRequests.length > 0) {
+    return NextResponse.json(
+      { error: { formErrors: ["แบบเสนอโครงการนี้ถูกใช้ยื่นแบบขอยืมเงินทุนไปแล้ว"] } },
+      { status: 409 }
+    );
+  }
+  if (proposal.committeeAmount != null && data.requestedAmount > proposal.committeeAmount) {
+    return NextResponse.json(
+      {
+        error: {
+          fieldErrors: {
+            requestedAmount: [
+              `วงเงินขอยืมต้องไม่เกินวงเงินที่ประธานกรรมการอนุมัติ (${proposal.committeeAmount.toLocaleString("th-TH")} บาท)`,
+            ],
           },
         },
-        { status: 400 }
-      );
-    }
-    linkedProposal = proposal;
+      },
+      { status: 400 }
+    );
   }
+  const linkedProposal = proposal;
 
   // หมายเหตุ: ตั้งใจไม่รับ workerOpinion/committeeDecision ฯลฯ จาก payload นี้ — ผู้ยื่นขอยืมเงิน
   // (ครัวเรือน) ต้องไม่สามารถตั้งค่าความเห็นพัฒนากร/ผลอนุมัติของตนเองได้ ต้องผ่าน endpoint
@@ -102,31 +112,25 @@ export async function POST(request: Request) {
     repaymentDueDate: new Date(data.repaymentDueDate),
   };
   let loanRequest;
-  if (linkedProposal) {
-    try {
-      loanRequest = await prisma.loanRequest.create({
-        data: {
-          ...commonData,
-          volumeNo: linkedProposal.volumeNo,
-          requestNo: linkedProposal.proposalNo,
-          proposalId: linkedProposal.id,
-        },
-      });
-    } catch (error) {
-      // กรณีหายาก: เลขที่ของแบบเสนอโครงการชนกับเลขที่ที่มีอยู่แล้วในแบบขอยืมเงินทุน (ข้อมูลเก่าก่อนระบบออกเลข
-      // อัตโนมัติแบบพูลรวม) — แจ้งผู้ใช้ให้ติดต่อผู้ดูแลระบบแทนการปล่อยให้ 500
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-        return NextResponse.json(
-          { error: { formErrors: ["ไม่สามารถออกเลขที่อ้างอิงจากแบบเสนอโครงการนี้ได้ กรุณาติดต่อผู้ดูแลระบบ"] } },
-          { status: 409 }
-        );
-      }
-      throw error;
+  try {
+    loanRequest = await prisma.loanRequest.create({
+      data: {
+        ...commonData,
+        volumeNo: linkedProposal.volumeNo,
+        requestNo: linkedProposal.proposalNo,
+        proposalId: linkedProposal.id,
+      },
+    });
+  } catch (error) {
+    // กรณีหายาก: เลขที่ของแบบเสนอโครงการชนกับเลขที่ที่มีอยู่แล้วในแบบขอยืมเงินทุน (ข้อมูลเก่าก่อนระบบออกเลข
+    // อัตโนมัติแบบพูลรวม) — แจ้งผู้ใช้ให้ติดต่อผู้ดูแลระบบแทนการปล่อยให้ 500
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return NextResponse.json(
+        { error: { formErrors: ["ไม่สามารถออกเลขที่อ้างอิงจากแบบเสนอโครงการนี้ได้ กรุณาติดต่อผู้ดูแลระบบ"] } },
+        { status: 409 }
+      );
     }
-  } else {
-    loanRequest = await createLoanRequestWithAutoNumber(({ volumeNo, requestNo }) =>
-      prisma.loanRequest.create({ data: { ...commonData, volumeNo, requestNo } })
-    );
+    throw error;
   }
 
   // แจ้งเตือนพัฒนากรผู้รับผิดชอบตำบลและประธานกรรมการหมู่บ้าน ให้เห็นคำร้องใหม่ที่รอพิจารณาทันที

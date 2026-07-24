@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useForm, Controller, type Path } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -219,6 +220,29 @@ function NewLoanRequestForm() {
             </p>
           )}
           <p className="mt-1 text-sm">รอความเห็นพัฒนากรและผลการพิจารณาอนุมัติเงินยืมของคณะกรรมการ กข.คจ. หมู่บ้าน</p>
+        </div>
+      </PageContainer>
+    );
+  }
+
+  // ตามขั้นตอน กข.คจ.: ต้องมีแบบเสนอโครงการที่อนุมัติแล้วก่อน จึงจะยื่นแบบขอยืมเงินทุนได้ — ถ้าตรวจสอบแล้วไม่พบ
+  // (ไม่ว่าจะยังไม่เคยยื่นแบบเสนอโครงการเลย ยังไม่ได้รับอนุมัติ หรือแบบเสนอโครงการที่อ้างอิงถูกใช้ไปแล้ว) ให้กัน
+  // ไม่ให้เข้าฟอร์มนี้เลย พร้อมลิงก์พาไปยื่นแบบเสนอโครงการก่อน
+  if (!checkingProposalLink && !linkedProposal) {
+    return (
+      <PageContainer title="แบบขอยืมเงินทุนของครัวเรือนเป้าหมาย" subtitle="ตามโครงการแก้ไขปัญหาความยากจน (กข.คจ.)">
+        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-5 text-amber-800">
+          <p className="text-base font-bold">ยังไม่สามารถยื่นแบบขอยืมเงินทุนได้</p>
+          <p className="mt-2 text-sm">
+            {linkError ??
+              "ต้องมีแบบเสนอโครงการที่ได้รับการอนุมัติจากคณะกรรมการ กข.คจ. หมู่บ้านก่อน จึงจะยื่นแบบขอยืมเงินทุนได้"}
+          </p>
+          <Link
+            href="/proposals/new"
+            className="mt-4 inline-flex min-h-11 items-center rounded-full bg-amber-600 px-4 text-sm font-semibold text-white"
+          >
+            + ยื่นแบบเสนอโครงการ
+          </Link>
         </div>
       </PageContainer>
     );
