@@ -76,19 +76,24 @@ function NewLoanRequestForm() {
 
   // ยื่นผ่านลิงก์ในการแจ้งเตือนอนุมัติแบบเสนอโครงการ (?proposalId=...) — ดึงเล่มที่/โครงการที่/วงเงินที่อนุมัติ
   // และผู้ให้ความยินยอมของครัวเรือนนั้นมาเติมให้อัตโนมัติ ไม่ต้องกรอกซ้ำ
+  //
+  // ถ้าไม่มี proposalId ในลิงก์ (เช่น พลาดกดแจ้งเตือน หรือกดทำเครื่องหมายอ่านแล้วไปก่อน) ให้ตรวจสอบเองว่าครัวเรือน
+  // นี้มีแบบเสนอโครงการที่อนุมัติแล้วแต่ยังไม่ได้ใช้ยื่นค้างอยู่หรือไม่ (ดู /api/proposals/pending-loan-link) แล้ว
+  // อ้างอิงให้อัตโนมัติเหมือนกัน — เพื่อให้เพดานวงเงินตามที่ประธานอนุมัติมีผลบังคับใช้เสมอ ไม่ขึ้นกับว่าคลิกลิงก์
+  // แจ้งเตือนหรือไม่ (ต่างจากตอนมี proposalId ชัดเจน: ที่นี่ไม่ error ถ้าไม่พบ ปล่อยให้ยื่นแบบอิสระตามปกติ)
   useEffect(() => {
-    if (!proposalIdParam) return;
     let cancelled = false;
-    fetch(`/api/proposals/${proposalIdParam}`)
+    const url = proposalIdParam ? `/api/proposals/${proposalIdParam}` : "/api/proposals/pending-loan-link";
+    fetch(url)
       .then(async (res) => {
-        if (!res.ok) {
+        if (proposalIdParam && !res.ok) {
           const body = await res.json().catch(() => null);
           throw new Error(body?.error?.formErrors?.[0] ?? "ไม่สามารถโหลดข้อมูลแบบเสนอโครงการที่อ้างอิงได้");
         }
         return res.json();
       })
-      .then((data: LinkedProposal) => {
-        if (cancelled) return;
+      .then((data: LinkedProposal | null) => {
+        if (cancelled || !data) return;
         setLinkedProposal(data);
         setValue("householdId", data.householdId);
         setValue("applicantAge", data.applicantAge);
@@ -96,7 +101,7 @@ function NewLoanRequestForm() {
         if (data.consentPersonName) setValue("spouseConsentName", data.consentPersonName);
       })
       .catch((err: Error) => {
-        if (!cancelled) setLinkError(err.message);
+        if (!cancelled && proposalIdParam) setLinkError(err.message);
       });
     return () => {
       cancelled = true;
