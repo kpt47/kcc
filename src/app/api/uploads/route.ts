@@ -41,23 +41,39 @@ export async function POST(request: Request) {
 
   const filename = `${randomUUID()}.${extension}`;
 
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const blob = await put(`uploads/${filename}`, file, { access: "public" });
-    return NextResponse.json({ url: blob.url }, { status: 201 });
+  try {
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      const blob = await put(`uploads/${filename}`, file, { access: "public" });
+      return NextResponse.json({ url: blob.url }, { status: 201 });
+    }
+
+    if (process.env.NETLIFY) {
+      // ใช้ getStore (site-scoped, อยู่ถาวรข้าม deploy) ไม่ใช่ getDeployStore (ผูกกับแต่ละ deploy ถูกล้างทิ้งได้)
+      // ส่ง File ตรงๆ (เป็น Blob อยู่แล้ว) แทนการแปลงเป็น Buffer เพื่อให้ตรงกับ BlobInput ที่ store.set ต้องการ
+      const store = getStore("evidence-uploads");
+      await store.set(filename, file, { metadata: { contentType: file.type } });
+      return NextResponse.json({ url: `/api/uploads/file/${filename}` }, { status: 201 });
+    }
+
+    // Vercel (และ platform serverless อื่นๆ ที่มี filesystem แบบอ่านอย่างเดียว) เขียนไฟล์ลง public/uploads
+    // ไม่ได้เด็ดขาด (EROFS) — ถ้าไม่มี BLOB_READ_WRITE_TOKEN ต้องแจ้ง error ทันที ห้าม fallback ไปเขียนดิสก์
+    // เพราะจะพังแบบไม่มี error message ที่มีความหมายให้ผู้ใช้เห็น (เคยเกิดขึ้นจริงมาแล้วก่อนตั้งค่า Blob Storage)
+    if (process.env.VERCEL) {
+      console.error("Upload failed: BLOB_READ_WRITE_TOKEN is not set on Vercel — cannot write to read-only filesystem");
+      return NextResponse.json(
+        { error: { formErrors: ["ระบบจัดเก็บไฟล์ยังไม่ได้ตั้งค่า กรุณาติดต่อผู้ดูแลระบบ"] } },
+        { status: 500 }
+      );
+    }
+
+    const uploadsDir = path.join(process.cwd(), "public", "uploads");
+    await mkdir(uploadsDir, { recursive: true });
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await writeFile(path.join(uploadsDir, filename), buffer);
+
+    return NextResponse.json({ url: `/uploads/${filename}` }, { status: 201 });
+  } catch (err) {
+    console.error("Upload failed:", err);
+    return NextResponse.json({ error: { formErrors: ["อัปโหลดไฟล์ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"] } }, { status: 500 });
   }
-
-  if (process.env.NETLIFY) {
-    // ใช้ getStore (site-scoped, อยู่ถาวรข้าม deploy) ไม่ใช่ getDeployStore (ผูกกับแต่ละ deploy ถูกล้างทิ้งได้)
-    // ส่ง File ตรงๆ (เป็น Blob อยู่แล้ว) แทนการแปลงเป็น Buffer เพื่อให้ตรงกับ BlobInput ที่ store.set ต้องการ
-    const store = getStore("evidence-uploads");
-    await store.set(filename, file, { metadata: { contentType: file.type } });
-    return NextResponse.json({ url: `/api/uploads/file/${filename}` }, { status: 201 });
-  }
-
-  const uploadsDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadsDir, { recursive: true });
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(uploadsDir, filename), buffer);
-
-  return NextResponse.json({ url: `/uploads/${filename}` }, { status: 201 });
 }

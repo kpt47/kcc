@@ -27,9 +27,25 @@ async function launchBrowser(): Promise<Browser> {
   return puppeteer.launch({ headless: true }) as unknown as Promise<Browser>;
 }
 
-export function getBrowser(): Promise<Browser> {
+export async function getBrowser(): Promise<Browser> {
   if (!globalForPuppeteer.puppeteerBrowser) {
-    globalForPuppeteer.puppeteerBrowser = launchBrowser();
+    // ถ้า launch ล้มเหลว ต้องล้างค่าที่แคชไว้ทันที ไม่งั้น instance นี้จะติดค้างกับ rejected promise เดิมซ้ำๆ
+    // ทุกคำขอ PDF ถัดไปจนกว่า serverless instance จะถูก recycle ทั้งที่ครั้งถัดไปอาจ launch สำเร็จก็ได้
+    globalForPuppeteer.puppeteerBrowser = launchBrowser().catch((err) => {
+      globalForPuppeteer.puppeteerBrowser = undefined;
+      throw err;
+    });
   }
-  return globalForPuppeteer.puppeteerBrowser;
+  try {
+    const browser = await globalForPuppeteer.puppeteerBrowser;
+    // เบราว์เซอร์ที่แคชไว้อาจหลุดการเชื่อมต่อ/crash ไปแล้ว (เช่น ถูก OOM kill) — ต้อง launch ใหม่แทนใช้ตัวเดิม
+    if (!browser.connected) {
+      globalForPuppeteer.puppeteerBrowser = undefined;
+      return getBrowser();
+    }
+    return browser;
+  } catch (err) {
+    globalForPuppeteer.puppeteerBrowser = undefined;
+    throw err;
+  }
 }
