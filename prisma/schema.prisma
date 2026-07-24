@@ -150,6 +150,7 @@ model User {
   debtConfirmationsMade         DebtConfirmation[]
   recordedVisitLogs             VisitLog[]
   submittedInquiries            HouseholdInquiry[]
+  repliedInquiries              HouseholdInquiry[] @relation("InquiryRepliedBy")
 }
 
 /// ข้อมูลส่วนบุคคลของผู้ใช้ role HOUSEHOLD (1-to-1 กับ User, สร้างเมื่อมีการเปิดบัญชีให้ครัวเรือน)
@@ -763,6 +764,14 @@ enum InquiryTopic {
   OTHER // อื่นๆ (ดูข้อความจริงที่ topicOther)
 }
 
+/// สถานะการดำเนินการของคำร้อง — อัปเดตได้เฉพาะพัฒนาการอำเภอ/พัฒนาการจังหวัด (ดู canViewHouseholdInquiries)
+/// ไม่มีค่าเริ่มต้น (null = ยังไม่ดำเนินการ) จนกว่าผู้ดูแลจะเข้ามาอัปเดตครั้งแรก
+enum InquiryStatus {
+  IN_PROGRESS // กำลังแก้ไข
+  RESOLVED // เรียบร้อยแล้ว
+  OTHER // อื่นๆ (ดูข้อความจริงที่ statusOther)
+}
+
 /// เมนู "ปรึกษา/ร้องทุกข์" — ครัวเรือนเป้าหมายส่งข้อความถึงพัฒนาการอำเภอ/พัฒนาการจังหวัดในเขตพื้นที่ของตนเอง
 /// เพื่อการพัฒนาบริการต่างๆ ให้ดีขึ้น villageId เก็บซ้ำจาก household.villageId (denormalized) เพื่อกรองตามเขต
 /// พื้นที่ (scopeWhereDirect ใน lib/scope.ts) ได้โดยตรงโดยไม่ต้อง join ผ่าน household ทุกครั้ง
@@ -778,6 +787,12 @@ model HouseholdInquiry {
   attachmentUrl String? // ไฟล์/รูปภาพประกอบ (ถ้ามี) — ดู src/app/api/uploads/route.ts
   submittedById Int
   submittedBy   User            @relation(fields: [submittedById], references: [id])
+  status        InquiryStatus?
+  statusOther   String? // ข้อความสถานะที่กรอกเอง — ใช้เมื่อ status = OTHER เท่านั้น
+  reply         String? // ข้อความตอบกลับจากพัฒนาการอำเภอ/พัฒนาการจังหวัด — ครัวเรือนเห็นได้
+  repliedById   Int?
+  repliedBy     User?           @relation("InquiryRepliedBy", fields: [repliedById], references: [id])
+  repliedAt     DateTime?
   createdAt     DateTime        @default(now())
 
   @@index([villageId])

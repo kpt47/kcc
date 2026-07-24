@@ -6,10 +6,16 @@ import { prisma } from "@/lib/prisma";
 import { formatThaiDateTime } from "@/lib/thai";
 
 const TOPIC_LABEL: Record<string, string> = { CONSULT: "ปรึกษา", COMPLAINT: "ร้องทุกข์", OTHER: "อื่นๆ" };
+const STATUS_LABEL: Record<string, string> = { IN_PROGRESS: "กำลังแก้ไข", RESOLVED: "เรียบร้อยแล้ว", OTHER: "อื่นๆ" };
+const STATUS_STYLE: Record<string, string> = {
+  IN_PROGRESS: "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300",
+  RESOLVED: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300",
+  OTHER: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+};
 
 // หน้า "ปรึกษา/ร้องทุกข์" — เฉพาะครัวเรือนเป้าหมาย (เข้าถึงได้ผ่านเมนูใน src/lib/navLinks.ts เท่านั้น)
 // ส่งถึงพัฒนาการอำเภอ/พัฒนาการจังหวัดในเขตพื้นที่ของหมู่บ้านตนเองโดยตรง (ดู notifyDistrictAndProvinceAdmins
-// ใน lib/notifications/notifyUsers.ts) ฝั่งผู้ดูแลดูได้ที่ /settings/household-inquiries
+// ใน lib/notifications/notifyUsers.ts) ฝั่งผู้ดูแลดูและตอบกลับได้ที่ /admin/household-inquiries
 export const dynamic = "force-dynamic";
 
 export default async function HouseholdInquiriesPage() {
@@ -70,6 +76,21 @@ export default async function HouseholdInquiriesPage() {
                   >
                     ดูไฟล์ที่แนบ
                   </a>
+                )}
+                {inq.status ? (
+                  <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLE[inq.status]}`}>
+                    สถานะ: {inq.status === "OTHER" ? inq.statusOther || "อื่นๆ" : STATUS_LABEL[inq.status]}
+                  </span>
+                ) : (
+                  <span className="w-fit rounded-full bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:bg-rose-900/60 dark:text-rose-300">
+                    ยังไม่ดำเนินการ
+                  </span>
+                )}
+                {inq.reply && (
+                  <div className="mt-1 rounded-xl bg-sky-50 p-3 dark:bg-sky-950/40">
+                    <p className="text-xs font-semibold text-sky-700 dark:text-sky-300">คำตอบจากพัฒนาการอำเภอ/จังหวัด</p>
+                    <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">{inq.reply}</p>
+                  </div>
                 )}
               </div>
             ))}

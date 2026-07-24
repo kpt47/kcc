@@ -12,6 +12,7 @@ import {
 import { notifyDistrictAndProvinceAdmins } from "@/lib/notifications/notifyUsers";
 
 const TOPIC_LABEL: Record<string, string> = { CONSULT: "ปรึกษา", COMPLAINT: "ร้องทุกข์", OTHER: "อื่นๆ" };
+const STATUS_LABEL: Record<string, string> = { IN_PROGRESS: "กำลังแก้ไข", RESOLVED: "เรียบร้อยแล้ว", OTHER: "อื่นๆ" };
 
 // ดูรายการคำร้อง "ปรึกษา/ร้องทุกข์" — ครัวเรือนเห็นเฉพาะของตนเอง, ผู้บริหารอำเภอ/จังหวัดเห็นตามเขตพื้นที่ของตน
 export async function GET() {
@@ -41,6 +42,7 @@ export async function GET() {
         },
       },
       submittedBy: { select: { username: true } },
+      repliedBy: { select: { username: true } },
     },
   });
 
@@ -60,6 +62,11 @@ export async function GET() {
       districtName: r.village.subDistrict.district.name,
       provinceName: r.village.subDistrict.district.province.name,
       submittedByUsername: r.submittedBy.username,
+      status: r.status,
+      statusLabel: r.status ? (r.status === "OTHER" ? r.statusOther || "อื่นๆ" : STATUS_LABEL[r.status]) : null,
+      reply: r.reply,
+      repliedAt: r.repliedAt ? r.repliedAt.toISOString() : null,
+      repliedByUsername: r.repliedBy?.username ?? null,
     }))
   );
 }
@@ -105,7 +112,7 @@ export async function POST(request: Request) {
   await notifyDistrictAndProvinceAdmins(
     household.villageId,
     `ครัวเรือน ${household.headFirstName} ${household.headLastName} ส่งคำร้อง "${topicLabel}" ใหม่`,
-    "/settings/household-inquiries"
+    "/admin/household-inquiries"
   );
 
   return NextResponse.json({ id: created.id }, { status: 201 });

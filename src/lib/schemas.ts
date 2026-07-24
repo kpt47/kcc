@@ -145,6 +145,19 @@ export const householdInquirySchema = z
   });
 export type HouseholdInquiryFormValues = z.infer<typeof householdInquirySchema>;
 
+// พัฒนาการอำเภอ/พัฒนาการจังหวัดตอบกลับ+อัปเดตสถานะคำร้อง — /api/household-inquiries/[id]
+export const householdInquiryReplySchema = z
+  .object({
+    status: z.enum(["IN_PROGRESS", "RESOLVED", "OTHER"], { error: "กรุณาเลือกสถานะ" }),
+    statusOther: z.string().trim().optional(),
+    reply: z.string().trim().max(2000, "ข้อความตอบกลับยาวเกินไป").optional(),
+  })
+  .refine((data) => data.status !== "OTHER" || !!data.statusOther, {
+    message: "กรุณากรอกสถานะ",
+    path: ["statusOther"],
+  });
+export type HouseholdInquiryReplyFormValues = z.infer<typeof householdInquiryReplySchema>;
+
 // ค้นหา/กรองครัวเรือนเป้าหมาย — /api/households/search
 export const householdSearchSchema = z.object({
   q: z.string().trim().optional(),
