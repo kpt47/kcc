@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, CheckCircle2, XCircle, Clock3 } from "lucide-react";
 import { formatThaiDate } from "@/lib/thai";
+import { ThaiDateField } from "@/components/form/ThaiDateField";
 
 export type HouseholdConfirmationStatus = {
   householdId: number;
@@ -73,15 +74,11 @@ export function DebtConfirmationAdminCard({
             className="min-h-11 w-28 rounded-lg border border-slate-300 px-3 text-base"
           />
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-300">วันที่เริ่มยืนยันยอด</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="min-h-11 rounded-lg border border-slate-300 px-3 text-base"
-          />
-        </div>
+        <ThaiDateField
+          label="วันที่เริ่มยืนยันยอด"
+          value={date}
+          onChange={(isoDate) => setDate(isoDate ?? "")}
+        />
         <button
           type="submit"
           disabled={submitting}

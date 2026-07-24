@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { HouseholdSelect } from "@/components/form/HouseholdSelect";
 import { AddressCombobox, type AddressOption } from "@/components/form/AddressCombobox";
+import { ThaiDateField } from "@/components/form/ThaiDateField";
 import type { GlobalRole } from "@/generated/prisma/client";
 
 type AreaOption = { id: number; label: string };
@@ -314,25 +315,17 @@ export function NewUserModal() {
                     ))}
                   </select>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-500">วันที่เริ่มวาระ</label>
-                    <input
-                      type="date"
-                      value={termStartDate}
-                      onChange={(e) => setTermStartDate(e.target.value)}
-                      className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-slate-500">วันที่สิ้นสุดวาระ</label>
-                    <input
-                      type="date"
-                      value={termEndDate}
-                      onChange={(e) => setTermEndDate(e.target.value)}
-                      className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm"
-                    />
-                  </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <ThaiDateField
+                    label="วันที่เริ่มวาระ"
+                    value={termStartDate}
+                    onChange={(isoDate) => setTermStartDate(isoDate ?? "")}
+                  />
+                  <ThaiDateField
+                    label="วันที่สิ้นสุดวาระ"
+                    value={termEndDate}
+                    onChange={(isoDate) => setTermEndDate(isoDate ?? "")}
+                  />
                 </div>
               </>
             )}
@@ -386,15 +379,11 @@ export function NewUserModal() {
                   onChange={(e) => setPositionTitle(e.target.value)}
                   className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm"
                 />
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-slate-500">วันที่รับมอบงาน</label>
-                  <input
-                    type="date"
-                    value={handoverDate}
-                    onChange={(e) => setHandoverDate(e.target.value)}
-                    className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm"
-                  />
-                </div>
+                <ThaiDateField
+                  label="วันที่รับมอบงาน"
+                  value={handoverDate}
+                  onChange={(isoDate) => setHandoverDate(isoDate ?? "")}
+                />
               </>
             )}
 

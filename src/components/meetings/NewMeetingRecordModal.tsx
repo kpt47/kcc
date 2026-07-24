@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ThaiDateField } from "@/components/form/ThaiDateField";
 
 export function NewMeetingRecordModal() {
   const router = useRouter();
@@ -87,16 +88,12 @@ export function NewMeetingRecordModal() {
       <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
         <h2 className="text-lg font-bold text-slate-900">อัปโหลดวาระการประชุม</h2>
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">วันที่ประชุม</label>
-            <input
-              type="date"
-              value={meetingDate}
-              onChange={(e) => setMeetingDate(e.target.value)}
-              required
-              className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm"
-            />
-          </div>
+          <ThaiDateField
+            label="วันที่ประชุม"
+            required
+            value={meetingDate}
+            onChange={(isoDate) => setMeetingDate(isoDate ?? "")}
+          />
           <input
             type="text"
             placeholder="หัวข้อวาระการประชุม"

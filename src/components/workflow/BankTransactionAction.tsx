@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ThaiDateField } from "@/components/form/ThaiDateField";
 
 export function BankTransactionAction({ bankAccountId }: { bankAccountId: number }) {
   const router = useRouter();
@@ -65,23 +66,20 @@ export function BankTransactionAction({ bankAccountId }: { bankAccountId: number
           <input type="radio" checked={type === "withdraw"} onChange={() => setType("withdraw")} /> ถอน
         </label>
       </div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <input
-          type="number"
-          placeholder="จำนวนเงิน (บาท)"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          required
-          className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
-        />
-        <input
-          type="date"
-          value={transactionDate}
-          onChange={(e) => setTransactionDate(e.target.value)}
-          required
-          className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
-        />
-      </div>
+      <input
+        type="number"
+        placeholder="จำนวนเงิน (บาท)"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        required
+        className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
+      />
+      <ThaiDateField
+        label="วันที่ทำรายการ"
+        required
+        value={transactionDate}
+        onChange={(isoDate) => setTransactionDate(isoDate ?? "")}
+      />
       <input
         type="text"
         placeholder="รายการ"

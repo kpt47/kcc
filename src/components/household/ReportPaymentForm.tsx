@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Banknote, CalendarDays, MessageSquare, Send } from "lucide-react";
+import { Banknote, MessageSquare, Send } from "lucide-react";
 import { EvidenceUploadButton } from "@/components/workflow/EvidenceUploadButton";
+import { ThaiDateField } from "@/components/form/ThaiDateField";
 
 export function ReportPaymentForm() {
   const router = useRouter();
@@ -66,19 +67,12 @@ export function ReportPaymentForm() {
           className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base"
         />
       </div>
-      <div>
-        <label className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-          <CalendarDays className="h-4 w-4 shrink-0" aria-hidden />
-          วันที่โอนเงิน
-        </label>
-        <input
-          type="date"
-          value={paymentDate}
-          onChange={(e) => setPaymentDate(e.target.value)}
-          required
-          className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-base"
-        />
-      </div>
+      <ThaiDateField
+        label="วันที่โอนเงิน"
+        required
+        value={paymentDate}
+        onChange={(isoDate) => setPaymentDate(isoDate ?? "")}
+      />
       <div>
         <p className="mb-1 text-sm font-semibold text-slate-700">สลิปโอนเงิน (บังคับแนบ)</p>
         <EvidenceUploadButton url={transferSlipUrl} onUploaded={(url) => setTransferSlipUrl(url)} showPreview />

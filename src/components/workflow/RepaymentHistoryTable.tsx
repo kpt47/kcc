@@ -4,6 +4,7 @@ import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatThaiDate } from "@/lib/formatDate";
 import { confirmDialog } from "@/lib/confirmDialog";
+import { ThaiDateField } from "@/components/form/ThaiDateField";
 
 const REPAYMENT_EDIT_WARNING = "การแก้ไขข้อมูลนี้จะส่งผลต่อยอดเงินคงเหลือของสัญญายืมเงินนี้ คุณต้องการดำเนินการต่อหรือไม่?";
 const REPAYMENT_DELETE_WARNING = "การลบข้อมูลนี้จะส่งผลต่อยอดเงินคงเหลือของสัญญายืมเงินนี้ คุณต้องการดำเนินการต่อหรือไม่?";
@@ -68,23 +69,20 @@ function EditForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <input
-          type="date"
-          value={paymentDate}
-          onChange={(e) => setPaymentDate(e.target.value)}
-          required
-          className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
-        />
-        <input
-          type="number"
-          placeholder="จำนวนเงิน"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          required
-          className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
-        />
-      </div>
+      <ThaiDateField
+        label="วันที่ชำระ"
+        required
+        value={paymentDate}
+        onChange={(isoDate) => setPaymentDate(isoDate ?? "")}
+      />
+      <input
+        type="number"
+        placeholder="จำนวนเงิน"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        required
+        className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
+      />
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <input
           type="text"

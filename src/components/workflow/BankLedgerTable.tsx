@@ -6,6 +6,7 @@ import { formatThaiDate } from "@/lib/formatDate";
 import { EvidenceUploadButton } from "./EvidenceUploadButton";
 import { confirmDialog } from "@/lib/confirmDialog";
 import { SortableHeader } from "@/components/official-reports/SortableHeader";
+import { ThaiDateField } from "@/components/form/ThaiDateField";
 
 type SortField = "transactionDate" | "description" | "depositAmount" | "withdrawAmount" | "balance";
 
@@ -67,10 +68,13 @@ function EditForm({ row, onCancel, onSaved }: { row: BankLedgerRow; onCancel: ()
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <input type="date" value={transactionDate} onChange={(e) => setTransactionDate(e.target.value)} required className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm" />
-        <input type="text" placeholder="เลขที่เอกสาร" value={documentNo} onChange={(e) => setDocumentNo(e.target.value)} className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm" />
-      </div>
+      <ThaiDateField
+        label="วันที่ทำรายการ"
+        required
+        value={transactionDate}
+        onChange={(isoDate) => setTransactionDate(isoDate ?? "")}
+      />
+      <input type="text" placeholder="เลขที่เอกสาร" value={documentNo} onChange={(e) => setDocumentNo(e.target.value)} className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm" />
       <input type="text" placeholder="รายการ" value={description} onChange={(e) => setDescription(e.target.value)} required className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm" />
       <div className="grid grid-cols-2 gap-2">
         <input type="number" placeholder="ฝาก" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm" />

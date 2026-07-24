@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { EvidenceUploadButton } from "./EvidenceUploadButton";
+import { ThaiDateField } from "@/components/form/ThaiDateField";
 import { ReceiptModal } from "@/components/receipts/ReceiptModal";
 import type { ReceiptData } from "@/components/receipts/ReceiptTemplate";
 
@@ -96,19 +97,12 @@ export function RepaymentAction({
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <input
               type="number"
               placeholder="จำนวนเงิน (บาท)"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              required
-              className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
-            />
-            <input
-              type="date"
-              value={paymentDate}
-              onChange={(e) => setPaymentDate(e.target.value)}
               required
               className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
             />
@@ -120,6 +114,12 @@ export function RepaymentAction({
               className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
             />
           </div>
+          <ThaiDateField
+            label="วันที่ชำระ"
+            required
+            value={paymentDate}
+            onChange={(isoDate) => setPaymentDate(isoDate ?? "")}
+          />
           <div>
             <p className="mb-1 text-xs font-semibold text-slate-500">สลิปโอนเงิน (ถ้ามี)</p>
             <EvidenceUploadButton url={transferSlipUrl} onUploaded={(url) => setTransferSlipUrl(url)} />

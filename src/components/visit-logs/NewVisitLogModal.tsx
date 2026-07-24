@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ThaiDateField } from "@/components/form/ThaiDateField";
 
 const VISIT_TYPE_OPTIONS = ["ร่วมประชุม", "ติดตามหนี้สิน", "ตรวจเยี่ยมครัวเรือน", "ให้คำแนะนำ", "อื่นๆ"];
 
@@ -117,16 +118,12 @@ export function NewVisitLogModal({ villages }: { villages: { id: number; village
             </select>
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-semibold text-slate-500">วันที่ลงพื้นที่</label>
-            <input
-              type="date"
-              value={visitDate}
-              onChange={(e) => setVisitDate(e.target.value)}
-              required
-              className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm"
-            />
-          </div>
+          <ThaiDateField
+            label="วันที่ลงพื้นที่"
+            required
+            value={visitDate}
+            onChange={(isoDate) => setVisitDate(isoDate ?? "")}
+          />
 
           <div>
             <label className="mb-1 block text-xs font-semibold text-slate-500">ประเภทการลงพื้นที่</label>

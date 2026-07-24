@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ThaiDateField } from "@/components/form/ThaiDateField";
 
 export function LoanRequestSelfEditAction({
   id,
@@ -52,23 +53,20 @@ export function LoanRequestSelfEditAction({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-      <div className="grid grid-cols-2 gap-2">
-        <input
-          type="number"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="จำนวนเงินที่ขอยืม"
-          required
-          className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
-        />
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          required
-          className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
-        />
-      </div>
+      <input
+        type="number"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        placeholder="จำนวนเงินที่ขอยืม"
+        required
+        className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
+      />
+      <ThaiDateField
+        label="วันที่ยื่นคำขอ"
+        required
+        value={date}
+        onChange={(isoDate) => setDate(isoDate ?? "")}
+      />
       {error && <p className="text-xs font-medium text-rose-600">{error}</p>}
       <div className="flex gap-2">
         <button
