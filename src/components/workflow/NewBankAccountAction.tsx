@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { THAI_BANKS } from "@/lib/thaiBanks";
 
 // ยื่นคำขอเปิดบัญชีธนาคารใหม่ให้หมู่บ้าน — บัญชีที่สร้างยังบันทึกฝาก-ถอนไม่ได้จนกว่าจะผ่านการลงนามอนุมัติ
 // ครบ 2 ฝ่าย (ประธาน + ฝ่ายการเงิน) ดู BankAccountApproveAction
@@ -53,14 +54,19 @@ export function NewBankAccountAction({ villageId }: { villageId: number }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
       <p className="text-sm font-semibold text-slate-700">ยื่นคำขอเปิดบัญชีธนาคารใหม่</p>
-      <input
-        type="text"
-        placeholder="ชื่อธนาคาร"
+      <select
         value={bankName}
         onChange={(e) => setBankName(e.target.value)}
         required
         className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
-      />
+      >
+        <option value="">-- เลือกธนาคาร --</option>
+        {THAI_BANKS.map((bank) => (
+          <option key={bank} value={bank}>
+            {bank}
+          </option>
+        ))}
+      </select>
       <input
         type="text"
         placeholder="สาขา (ถ้ามี)"
