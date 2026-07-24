@@ -11,7 +11,7 @@ import { MoneyField } from "@/components/form/MoneyField";
 import { ThaiDateField } from "@/components/form/ThaiDateField";
 import { HouseholdSelect, type HouseholdOption } from "@/components/form/HouseholdSelect";
 import { proposalSchema, PROPOSAL_STEP_FIELDS, type ProposalFormValues, type ProposalSubmitValues } from "@/lib/schemas";
-import { thaiBahtText } from "@/lib/thai";
+import { thaiBahtText, calculateAge } from "@/lib/thai";
 import { formatThaiDate } from "@/lib/formatDate";
 
 const STEPS = [
@@ -32,11 +32,22 @@ export default function NewProposalPage() {
     handleSubmit,
     trigger,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<ProposalFormValues, unknown, ProposalSubmitValues>({
     resolver: zodResolver(proposalSchema),
     defaultValues: { items: [{ description: "", amount: undefined }] },
   });
+
+  // เลือกครัวเรือนแล้ว: เติมอายุปัจจุบัน (คำนวณจากวันเกิดที่บันทึกไว้ในทะเบียนครัวเรือนเป้าหมาย) และอาชีพให้อัตโนมัติ
+  // — ยังแก้ไขทับเองได้ตามปกติ เผื่อครัวเรือนยังไม่มีข้อมูลวันเกิด/อาชีพ หรือข้อมูลเปลี่ยนแปลงไปแล้ว
+  function handleSelectHousehold(household: HouseholdOption | undefined) {
+    setSelectedHousehold(household);
+    if (!household) return;
+    const age = calculateAge(household.birthDate);
+    if (age !== undefined) setValue("applicantAge", age);
+    if (household.occupation) setValue("occupation", household.occupation);
+  }
 
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
   const values = watch();
@@ -99,7 +110,7 @@ export default function NewProposalPage() {
                   error={errors.householdId?.message}
                   value={field.value}
                   onChange={field.onChange}
-                  onSelectHousehold={setSelectedHousehold}
+                  onSelectHousehold={handleSelectHousehold}
                 />
               )}
             />

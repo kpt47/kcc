@@ -7,7 +7,14 @@ import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
 import { TextField } from "@/components/form/TextField";
 import { MoneyField } from "@/components/form/MoneyField";
 import { VillagePicker } from "@/components/form/VillagePicker";
-import { householdSchema, type HouseholdFormValues, type HouseholdSubmitValues } from "@/lib/schemas";
+import { ThaiDateField } from "@/components/form/ThaiDateField";
+import {
+  householdSchema,
+  TITLE_PREFIX_OPTIONS,
+  GENDER_OPTIONS,
+  type HouseholdFormValues,
+  type HouseholdSubmitValues,
+} from "@/lib/schemas";
 
 // ประธาน/เลขานุการคณะกรรมการหมู่บ้าน (VILLAGE_COMMITTEE) เพิ่มครัวเรือนได้เฉพาะหมู่บ้านของตนเองเท่านั้น
 // จึงไม่ต้องเลือกหมู่บ้านเลย (ล็อกไว้ให้อัตโนมัติ ไม่แสดง VillagePicker) — ส่วนพัฒนากรตำบล (SUB_DISTRICT_ADMIN)
@@ -102,6 +109,30 @@ export function NewHouseholdForm({ lockedVillage }: { lockedVillage: { id: numbe
             />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-300">คำนำหน้าชื่อ</label>
+              <select
+                className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm"
+                {...register("titlePrefix")}
+              >
+                <option value="">-- เลือกคำนำหน้า --</option>
+                {TITLE_PREFIX_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {values.titlePrefix === "OTHER" && (
+              <TextField
+                label="ระบุคำนำหน้าชื่อ"
+                required
+                error={errors.titlePrefixOther?.message}
+                {...register("titlePrefixOther")}
+              />
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <TextField
               label="ชื่อ (หัวหน้าครัวเรือน)"
               required
@@ -113,6 +144,33 @@ export function NewHouseholdForm({ lockedVillage }: { lockedVillage: { id: numbe
               required
               error={errors.headLastName?.message}
               {...register("headLastName")}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-700 dark:text-slate-300">เพศ</label>
+              <div className="flex min-h-11 items-center gap-4">
+                {GENDER_OPTIONS.map((o) => (
+                  <label key={o.value} className="flex items-center gap-1.5 text-sm text-slate-700">
+                    <input type="radio" value={o.value} {...register("gender")} /> {o.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <Controller
+              control={control}
+              name="birthDate"
+              render={({ field }) => (
+                <ThaiDateField label="วันเดือนปีเกิด" value={field.value} onChange={field.onChange} />
+              )}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TextField label="อาชีพ" error={errors.occupation?.message} {...register("occupation")} />
+            <TextField
+              label="ความสามารถพิเศษ"
+              error={errors.specialSkills?.message}
+              {...register("specialSkills")}
             />
           </div>
           <TextField

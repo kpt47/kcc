@@ -258,13 +258,32 @@ model Village {
 }
 
 /// ครัวเรือนเป้าหมาย (เล่มม่วง หน้า 1: บัญชีทะเบียนครัวเรือนเป้าหมาย)
+/// คำนำหน้าชื่อหัวหน้าครัวเรือน — เก็บเป็นค่าคงที่ 3 แบบ หรือ OTHER เมื่อกรอกเอง (ดู titlePrefixOther)
+enum TitlePrefix {
+  MR // นาย
+  MRS // นาง
+  MISS // นางสาว
+  OTHER // อื่นๆ (ดูข้อความจริงที่ titlePrefixOther)
+}
+
+enum Gender {
+  MALE // ชาย
+  FEMALE // หญิง
+}
+
 model TargetHousehold {
   id                Int      @id @default(autoincrement())
   villageId         Int
   village           Village  @relation(fields: [villageId], references: [id])
   sequenceNo        Int // ลำดับที่ครัวเรือนเป้าหมาย (เรียงรายได้น้อยไปมาก)
+  titlePrefix       TitlePrefix? // คำนำหน้าชื่อหัวหน้าครัวเรือน (นาย/นาง/นางสาว/อื่นๆ)
+  titlePrefixOther  String? // ข้อความคำนำหน้าที่กรอกเอง — ใช้เมื่อ titlePrefix = OTHER เท่านั้น
   headFirstName     String // ชื่อหัวหน้าครัวเรือน
   headLastName      String // นามสกุลหัวหน้าครัวเรือน
+  gender            Gender? // เพศของหัวหน้าครัวเรือน
+  birthDate         DateTime? // วันเดือนปีเกิด — ใช้คำนวณอายุปัจจุบันอัตโนมัติตอนยื่นแบบเสนอโครงการ/ขอยืมเงินทุน
+  occupation        String? // อาชีพ — ดึงไปเติมอัตโนมัติในแบบเสนอโครงการ/แบบขอยืมเงินทุน (แก้ไขทับได้)
+  specialSkills     String? // ความสามารถพิเศษ
   houseNo           String? // บ้านเลขที่
   memberCount       Int? // จำนวนสมาชิกในครัวเรือน
   incomeBeforeLoan  Float? // รายได้เฉลี่ยต่อคนต่อปีตามเกณฑ์ จปฐ. ก่อนยืมเงิน (บาท)

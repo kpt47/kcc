@@ -19,6 +19,8 @@ export async function GET() {
       headFirstName: true,
       headLastName: true,
       houseNo: true,
+      birthDate: true,
+      occupation: true,
       village: {
         select: {
           villageName: true,
@@ -51,8 +53,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { sequenceNo, headFirstName, headLastName, houseNo, memberCount, incomeBeforeLoan, incomeAfter1, incomeAfter2, incomeAfter3 } =
-    parsed.data;
+  const {
+    sequenceNo,
+    titlePrefix,
+    titlePrefixOther,
+    headFirstName,
+    headLastName,
+    gender,
+    birthDate,
+    occupation,
+    specialSkills,
+    houseNo,
+    memberCount,
+    incomeBeforeLoan,
+    incomeAfter1,
+    incomeAfter2,
+    incomeAfter3,
+  } = parsed.data;
 
   // ประธาน/เลขานุการคณะกรรมการหมู่บ้าน (VILLAGE_COMMITTEE) เพิ่มครัวเรือนได้เฉพาะหมู่บ้านของตนเองเท่านั้น —
   // บังคับใช้ villageId จากบัญชีผู้ใช้ (scopeVillageId) เสมอ ไม่รับค่า villageId ที่ frontend ส่งมาเด็ดขาด
@@ -92,8 +109,14 @@ export async function POST(request: Request) {
     data: {
       villageId,
       sequenceNo,
+      titlePrefix,
+      titlePrefixOther: titlePrefix === "OTHER" ? titlePrefixOther : undefined,
       headFirstName,
       headLastName,
+      gender,
+      birthDate: birthDate ? new Date(birthDate) : undefined,
+      occupation,
+      specialSkills,
       houseNo,
       memberCount,
       incomeBeforeLoan,

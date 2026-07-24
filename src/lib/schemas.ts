@@ -259,26 +259,48 @@ export type VillageFormValues = z.infer<typeof villageSchema>;
 // ---------------------------------------------------------------------------
 // ครัวเรือนเป้าหมาย (บัญชีทะเบียนครัวเรือนเป้าหมาย - เล่มม่วง)
 // ---------------------------------------------------------------------------
-export const householdSchema = z.object({
-  villageId: z
-    .number({ error: "กรุณาเลือกหมู่บ้าน" })
-    .int()
-    .positive("กรุณาเลือกหมู่บ้าน"),
-  sequenceNo: z
-    .number({ error: "กรุณากรอกลำดับที่ครัวเรือนเป้าหมาย" })
-    .int("ลำดับที่ต้องเป็นจำนวนเต็ม")
-    .positive("ลำดับที่ต้องมากกว่า 0"),
-  headFirstName: thaiNameField("ชื่อ"),
-  headLastName: thaiNameField("นามสกุล"),
-  houseNo: z.string().optional(),
-  memberCount: optionalNumber(
-    z.number().int("จำนวนสมาชิกต้องเป็นจำนวนเต็ม").min(1, "ต้องมีอย่างน้อย 1 คน").max(30, "จำนวนสมาชิกไม่ถูกต้อง")
-  ),
-  incomeBeforeLoan: optionalNumber(z.number().min(0, "รายได้ต้องไม่ติดลบ").max(10_000_000, "จำนวนเงินไม่ถูกต้อง")),
-  incomeAfter1: optionalNumber(z.number().min(0, "รายได้ต้องไม่ติดลบ").max(10_000_000, "จำนวนเงินไม่ถูกต้อง")),
-  incomeAfter2: optionalNumber(z.number().min(0, "รายได้ต้องไม่ติดลบ").max(10_000_000, "จำนวนเงินไม่ถูกต้อง")),
-  incomeAfter3: optionalNumber(z.number().min(0, "รายได้ต้องไม่ติดลบ").max(10_000_000, "จำนวนเงินไม่ถูกต้อง")),
-});
+export const TITLE_PREFIX_OPTIONS = [
+  { value: "MR", label: "นาย" },
+  { value: "MRS", label: "นาง" },
+  { value: "MISS", label: "นางสาว" },
+  { value: "OTHER", label: "อื่นๆ" },
+] as const;
+export const GENDER_OPTIONS = [
+  { value: "MALE", label: "ชาย" },
+  { value: "FEMALE", label: "หญิง" },
+] as const;
+
+export const householdSchema = z
+  .object({
+    villageId: z
+      .number({ error: "กรุณาเลือกหมู่บ้าน" })
+      .int()
+      .positive("กรุณาเลือกหมู่บ้าน"),
+    sequenceNo: z
+      .number({ error: "กรุณากรอกลำดับที่ครัวเรือนเป้าหมาย" })
+      .int("ลำดับที่ต้องเป็นจำนวนเต็ม")
+      .positive("ลำดับที่ต้องมากกว่า 0"),
+    titlePrefix: z.enum(["MR", "MRS", "MISS", "OTHER"]).optional(),
+    titlePrefixOther: z.string().trim().optional(),
+    headFirstName: thaiNameField("ชื่อ"),
+    headLastName: thaiNameField("นามสกุล"),
+    gender: z.enum(["MALE", "FEMALE"]).optional(),
+    birthDate: optionalIsoDate,
+    occupation: z.string().trim().optional(),
+    specialSkills: z.string().trim().optional(),
+    houseNo: z.string().optional(),
+    memberCount: optionalNumber(
+      z.number().int("จำนวนสมาชิกต้องเป็นจำนวนเต็ม").min(1, "ต้องมีอย่างน้อย 1 คน").max(30, "จำนวนสมาชิกไม่ถูกต้อง")
+    ),
+    incomeBeforeLoan: optionalNumber(z.number().min(0, "รายได้ต้องไม่ติดลบ").max(10_000_000, "จำนวนเงินไม่ถูกต้อง")),
+    incomeAfter1: optionalNumber(z.number().min(0, "รายได้ต้องไม่ติดลบ").max(10_000_000, "จำนวนเงินไม่ถูกต้อง")),
+    incomeAfter2: optionalNumber(z.number().min(0, "รายได้ต้องไม่ติดลบ").max(10_000_000, "จำนวนเงินไม่ถูกต้อง")),
+    incomeAfter3: optionalNumber(z.number().min(0, "รายได้ต้องไม่ติดลบ").max(10_000_000, "จำนวนเงินไม่ถูกต้อง")),
+  })
+  .refine((data) => data.titlePrefix !== "OTHER" || !!data.titlePrefixOther, {
+    message: "กรุณากรอกคำนำหน้าชื่อ",
+    path: ["titlePrefixOther"],
+  });
 
 // หมายเหตุ: ประกาศ type เองแบบ plain interface แทนการใช้ z.infer<> ตรงๆ เนื่องจาก schema นี้มีฟิลด์ที่
 // ใช้ optionalNumber() (ซึ่งภายในเป็น ZodEffects/ZodPipe) — z.infer ของ TypeScript กับ generic ที่
@@ -291,8 +313,14 @@ export const householdSchema = z.object({
 export interface HouseholdFormValues {
   villageId: number;
   sequenceNo: number;
+  titlePrefix?: "MR" | "MRS" | "MISS" | "OTHER";
+  titlePrefixOther?: string;
   headFirstName: string;
   headLastName: string;
+  gender?: "MALE" | "FEMALE";
+  birthDate?: string;
+  occupation?: string;
+  specialSkills?: string;
   houseNo?: string;
   memberCount?: number;
   incomeBeforeLoan?: number;
@@ -305,8 +333,14 @@ export interface HouseholdFormValues {
 export interface HouseholdSubmitValues {
   villageId: number;
   sequenceNo: number;
+  titlePrefix?: "MR" | "MRS" | "MISS" | "OTHER";
+  titlePrefixOther?: string;
   headFirstName: string;
   headLastName: string;
+  gender?: "MALE" | "FEMALE";
+  birthDate?: string;
+  occupation?: string;
+  specialSkills?: string;
   houseNo?: string;
   memberCount?: number;
   incomeBeforeLoan?: number;

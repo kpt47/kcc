@@ -10,6 +10,8 @@ export type HouseholdOption = {
   headFirstName: string;
   headLastName: string;
   houseNo: string | null;
+  birthDate: string | null;
+  occupation: string | null;
   village: {
     villageName: string;
     villageNo: string;

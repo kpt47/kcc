@@ -11,7 +11,7 @@ import { MoneyField } from "@/components/form/MoneyField";
 import { ThaiDateField } from "@/components/form/ThaiDateField";
 import { HouseholdSelect, type HouseholdOption } from "@/components/form/HouseholdSelect";
 import { loanRequestSchema, LOAN_REQUEST_STEP_FIELDS, type LoanRequestFormValues, type LoanRequestSubmitValues } from "@/lib/schemas";
-import { thaiBahtText } from "@/lib/thai";
+import { thaiBahtText, calculateAge } from "@/lib/thai";
 import { formatThaiDate } from "@/lib/formatDate";
 import { LOAN_CEILING_DEFAULT } from "@/lib/config";
 
@@ -33,6 +33,7 @@ export default function NewLoanRequestPage() {
     handleSubmit,
     trigger,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<LoanRequestFormValues, unknown, LoanRequestSubmitValues>({
     resolver: zodResolver(loanRequestSchema),
@@ -40,6 +41,16 @@ export default function NewLoanRequestPage() {
   });
 
   const values = watch();
+
+  // เลือกครัวเรือนแล้ว: เติมอายุปัจจุบัน (คำนวณจากวันเกิดที่บันทึกไว้ในทะเบียนครัวเรือนเป้าหมาย) และอาชีพให้อัตโนมัติ
+  // — ยังแก้ไขทับเองได้ตามปกติ เผื่อครัวเรือนยังไม่มีข้อมูลวันเกิด/อาชีพ หรือข้อมูลเปลี่ยนแปลงไปแล้ว
+  function handleSelectHousehold(household: HouseholdOption | undefined) {
+    setSelectedHousehold(household);
+    if (!household) return;
+    const age = calculateAge(household.birthDate);
+    if (age !== undefined) setValue("applicantAge", age);
+    if (household.occupation) setValue("occupation", household.occupation);
+  }
 
   async function goNext() {
     const fieldNames = LOAN_REQUEST_STEP_FIELDS[step] as unknown as Path<LoanRequestFormValues>[];
@@ -95,7 +106,7 @@ export default function NewLoanRequestPage() {
                   error={errors.householdId?.message}
                   value={field.value}
                   onChange={field.onChange}
-                  onSelectHousehold={setSelectedHousehold}
+                  onSelectHousehold={handleSelectHousehold}
                 />
               )}
             />

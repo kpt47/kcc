@@ -50,6 +50,19 @@ export function isoToThaiParts(value: string | Date | null | undefined) {
   };
 }
 
+/** คำนวณอายุปัจจุบัน (ปีเต็ม) จากวันเกิด — ใช้เติมอายุอัตโนมัติในแบบเสนอโครงการ/แบบขอยืมเงินทุน */
+export function calculateAge(birthDate: string | Date | null | undefined): number | undefined {
+  if (!birthDate) return undefined;
+  const d = typeof birthDate === "string" ? new Date(birthDate) : birthDate;
+  if (Number.isNaN(d.getTime())) return undefined;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const hasHadBirthdayThisYear =
+    today.getMonth() > d.getMonth() || (today.getMonth() === d.getMonth() && today.getDate() >= d.getDate());
+  if (!hasHadBirthdayThisYear) age -= 1;
+  return age;
+}
+
 /** จัดรูปแบบวันที่เป็น พ.ศ. แบบ DD/MM/YYYY (เช่น 24/07/2569) — มาตรฐานการแสดงผลวันที่ทั้งระบบ */
 export function formatThaiDate(value: string | Date | null | undefined): string {
   const parts = isoToThaiParts(value);
