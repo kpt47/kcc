@@ -1,4 +1,5 @@
-import { formatThaiDate, thaiBahtText } from "@/lib/thai";
+import { thaiBahtText } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 
 export type ReceiptData = {
   villageName: string;

@@ -1,4 +1,4 @@
-import { formatThaiDate } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { PendingPaymentAction } from "./PendingPaymentAction";
 
 export type PendingPaymentRow = {

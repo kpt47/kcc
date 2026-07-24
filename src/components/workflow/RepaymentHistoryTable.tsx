@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatThaiDate } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { confirmDialog } from "@/lib/confirmDialog";
 
 const REPAYMENT_EDIT_WARNING = "การแก้ไขข้อมูลนี้จะส่งผลต่อยอดเงินคงเหลือของสัญญายืมเงินนี้ คุณต้องการดำเนินการต่อหรือไม่?";

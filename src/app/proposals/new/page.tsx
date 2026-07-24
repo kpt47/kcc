@@ -11,7 +11,8 @@ import { MoneyField } from "@/components/form/MoneyField";
 import { ThaiDateField } from "@/components/form/ThaiDateField";
 import { HouseholdSelect, type HouseholdOption } from "@/components/form/HouseholdSelect";
 import { proposalSchema, PROPOSAL_STEP_FIELDS, type ProposalFormValues, type ProposalSubmitValues } from "@/lib/schemas";
-import { formatThaiDate, thaiBahtText } from "@/lib/thai";
+import { thaiBahtText } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 
 const STEPS = [
   { title: "ผู้เสนอโครงการ" },

@@ -50,10 +50,23 @@ export function isoToThaiParts(value: string | Date | null | undefined) {
   };
 }
 
+/** จัดรูปแบบวันที่เป็น พ.ศ. แบบ DD/MM/YYYY (เช่น 24/07/2569) — มาตรฐานการแสดงผลวันที่ทั้งระบบ */
 export function formatThaiDate(value: string | Date | null | undefined): string {
   const parts = isoToThaiParts(value);
   if (!parts) return "-";
-  return `${parts.day} ${THAI_MONTHS[parts.month - 1]} ${parts.beYear}`;
+  const dd = String(parts.day).padStart(2, "0");
+  const mm = String(parts.month).padStart(2, "0");
+  return `${dd}/${mm}/${parts.beYear}`;
+}
+
+/** จัดรูปแบบวันที่+เวลาเป็น พ.ศ. แบบ DD/MM/YYYY HH:mm (เช่น 24/07/2569 14:30) */
+export function formatThaiDateTime(value: string | Date | null | undefined): string {
+  if (!value) return "-";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "-";
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${formatThaiDate(d)} ${hours}:${minutes}`;
 }
 
 // ---------------------------------------------------------------------------

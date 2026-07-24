@@ -48,3 +48,6 @@ next-env.d.ts
 
 # uploaded evidence files (passbook images, transfer slips) - local dev storage
 /public/uploads
+
+.vercel
+.env*

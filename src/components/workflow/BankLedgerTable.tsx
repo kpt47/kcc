@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatThaiDate } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { EvidenceUploadButton } from "./EvidenceUploadButton";
 import { confirmDialog } from "@/lib/confirmDialog";
 import { SortableHeader } from "@/components/official-reports/SortableHeader";

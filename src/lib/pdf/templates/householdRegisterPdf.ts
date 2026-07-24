@@ -1,5 +1,5 @@
 import { documentShell, fill } from "../layout";
-import { formatThaiDate } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { VILLAGE_ADDRESS_INCLUDE, villageAddress } from "@/lib/geo";
 import type { Prisma } from "@/generated/prisma/client";
 

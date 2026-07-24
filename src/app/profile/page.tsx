@@ -1,5 +1,6 @@
 import { requireUser, getHouseholdProfileView, ROLE_LABELS, COMMITTEE_ROLE_LABELS } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { formatThaiDate } from "@/lib/formatDate";
 import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
 import { ChangePasswordForm } from "@/components/profile/ChangePasswordForm";
 import { EditSelfProfileForm } from "@/components/profile/EditSelfProfileForm";
@@ -95,13 +96,13 @@ export default async function ProfilePage() {
             <div className="flex justify-between gap-4">
               <dt className="text-slate-500">วันที่เริ่มวาระ</dt>
               <dd className="font-medium text-slate-900">
-                {committeeProfile.termStartDate ? new Date(committeeProfile.termStartDate).toLocaleDateString("th-TH") : "-"}
+                {formatThaiDate(committeeProfile.termStartDate)}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-slate-500">วันที่สิ้นสุดวาระ</dt>
               <dd className="font-medium text-slate-900">
-                {committeeProfile.termEndDate ? new Date(committeeProfile.termEndDate).toLocaleDateString("th-TH") : "-"}
+                {formatThaiDate(committeeProfile.termEndDate)}
               </dd>
             </div>
           </dl>

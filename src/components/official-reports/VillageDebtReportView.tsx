@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { exportRowsAsExcel } from "@/lib/export";
-import { formatThaiDate } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { SortableHeader } from "./SortableHeader";
 
 type VillageDebtorRow = {

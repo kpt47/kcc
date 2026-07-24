@@ -1,4 +1,5 @@
 import { documentShell, fill } from "../layout";
+import { formatThaiDate } from "@/lib/formatDate";
 import type { VillageConditionRow } from "@/lib/analytics";
 
 const LANDSCAPE_STYLE = `
@@ -46,7 +47,7 @@ export function renderDebtConditionReportHtml(rows: VillageConditionRow[], gener
         แบบรายงานภาวะหนี้สินและฐานะทางการเงิน โครงการแก้ไขปัญหาความยากจน (กข.คจ.)
       </p>
       <p class="center" style="margin: 2px 0 10px;">
-        Smart Report &amp; Map Center — ข้อมูล ณ วันที่ ${generatedAt.toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}
+        Smart Report &amp; Map Center — ข้อมูล ณ วันที่ ${formatThaiDate(generatedAt)}
       </p>
 
       <table class="ledger">

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatThaiDate } from "@/lib/formatDate";
 
 type NotificationItem = {
   id: number;
@@ -127,7 +128,7 @@ export function NotificationBell({ openUpward }: { openUpward?: boolean }) {
                       {n.type === "ALERT" ? "แจ้งเตือน" : "เตือนความจำ"}
                     </span>
                     <span className="shrink-0 text-[11px] text-slate-400">
-                      {new Date(n.createdAt).toLocaleDateString("th-TH")}
+                      {formatThaiDate(n.createdAt)}
                     </span>
                   </div>
                   {n.link ? (

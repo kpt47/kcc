@@ -12,7 +12,7 @@ import { RiskPieCard } from "@/components/dashboard/RiskPieCard";
 import { requireUser, type CurrentUser } from "@/lib/auth";
 import { hasMinRole } from "@/lib/authz";
 import { getAllowedVillageIds } from "@/lib/scope";
-import { formatThaiDate } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import {
   getBigPictureDashboardData,
   getHouseholdKpis,

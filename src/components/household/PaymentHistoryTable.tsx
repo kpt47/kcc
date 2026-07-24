@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2, Clock3, XCircle, Receipt as ReceiptIcon } from "lucide-react";
-import { formatThaiDate } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { ReceiptModal } from "@/components/receipts/ReceiptModal";
 import type { ReceiptData } from "@/components/receipts/ReceiptTemplate";
 

@@ -2,7 +2,7 @@ import { CheckCircle2, AlertTriangle, XCircle, History } from "lucide-react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { prisma } from "@/lib/prisma";
 import { THEMES } from "@/lib/theme";
-import { formatThaiDate } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { requireUser } from "@/lib/auth";
 import { ReportPaymentForm } from "@/components/household/ReportPaymentForm";
 import { PaymentHistoryTable, type PaymentHistoryRow } from "@/components/household/PaymentHistoryTable";

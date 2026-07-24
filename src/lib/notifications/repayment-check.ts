@@ -5,6 +5,7 @@ import { notifyHousehold } from "./channels";
 import { notifyUsers } from "./notifyUsers";
 import { recalculateLoanRiskStatuses } from "@/lib/risk";
 import { DEFAULT_REMINDER_LEAD_DAYS, MAX_REMINDER_LEAD_DAYS } from "@/lib/reminderSettings";
+import { formatThaiDate } from "@/lib/formatDate";
 
 function startOfDay(date: Date): Date {
   const d = new Date(date);
@@ -101,7 +102,7 @@ async function sendHouseholdReminders(today: Date): Promise<number> {
       if (!isSameDay(loan.dueDate, addDays(today, leadDays))) continue;
 
       const message =
-        `แจ้งเตือน: เงินยืมของท่านใกล้ครบกำหนดชำระในอีก ${leadDays} วัน (วันที่ ${loan.dueDate.toLocaleDateString("th-TH")}) ` +
+        `แจ้งเตือน: เงินยืมของท่านใกล้ครบกำหนดชำระในอีก ${leadDays} วัน (วันที่ ${formatThaiDate(loan.dueDate)}) ` +
         `ยอดคงเหลือ ${loan.outstandingBalance.toLocaleString("th-TH")} บาท กรุณาเตรียมชำระให้ตรงเวลา`;
 
       await notifyUsers([householdUser.id], message, "REMINDER");
@@ -186,7 +187,7 @@ async function sendOfficerOverdueAlerts(today: Date): Promise<{ officerNotificat
     const householdUsers = await prisma.user.findMany({ where: { role: "HOUSEHOLD", householdId: loan.householdId } });
     const message =
       `แจ้งเตือน: ท่านมียอดเงินยืมค้างชำระเกินกำหนด ${loan.outstandingBalance.toLocaleString("th-TH")} บาท ` +
-      `(ครบกำหนดวันที่ ${loan.dueDate?.toLocaleDateString("th-TH") ?? "-"}) กรุณาติดต่อชำระคืนเงินยืมโดยเร็ว`;
+      `(ครบกำหนดวันที่ ${formatThaiDate(loan.dueDate)}) กรุณาติดต่อชำระคืนเงินยืมโดยเร็ว`;
     for (const user of householdUsers) {
       await notifyHousehold(user, message);
       householdNotifications += 1;

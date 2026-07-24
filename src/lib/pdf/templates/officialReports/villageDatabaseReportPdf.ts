@@ -1,5 +1,6 @@
 import { documentShell, fill, signatureRow } from "../../layout";
 import type { Report3Row } from "@/lib/analytics";
+import { formatThaiDate } from "@/lib/formatDate";
 
 const STYLE = `
   .page { padding: 1cm 0.8cm; }
@@ -49,7 +50,7 @@ export function renderVillageDatabaseReportHtml(rows: Report3Row[], generatedAt:
         แบบรายงานฐานข้อมูลหมู่บ้านและครัวเรือนเป้าหมายโครงการแก้ไขปัญหาความยากจน (กข.คจ.)
       </p>
       <p class="center" style="margin: 2px 0 10px;">
-        ข้อมูล ณ วันที่ ${generatedAt.toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}
+        ข้อมูล ณ วันที่ ${formatThaiDate(generatedAt)}
       </p>
 
       <table class="ledger">

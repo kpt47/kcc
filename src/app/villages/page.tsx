@@ -2,7 +2,7 @@ import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
 import { SmartOmnibar } from "@/components/dashboard/SmartOmnibar";
 import { prisma } from "@/lib/prisma";
 import { THEMES } from "@/lib/theme";
-import { formatThaiDate } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { VILLAGE_ADDRESS_INCLUDE, villageAddress } from "@/lib/geo";
 import { requireUser } from "@/lib/auth";
 import { getAllowedVillageIds, scopeWhereDirect } from "@/lib/scope";

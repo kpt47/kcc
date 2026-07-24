@@ -4,7 +4,7 @@ import { WorkerOpinionAction } from "@/components/workflow/WorkerOpinionAction";
 import { ApproveAction } from "@/components/workflow/ApproveAction";
 import { ProposalSelfEditAction } from "@/components/workflow/ProposalSelfEditAction";
 import { prisma } from "@/lib/prisma";
-import { formatThaiDate } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { requireUser } from "@/lib/auth";
 import { canApproveProposalOrLoanRequest, canGiveWorkerOpinion, canViewRiskAssessment } from "@/lib/authz";
 import { getAllowedVillageIds, householdScopeWhere } from "@/lib/scope";

@@ -4,7 +4,7 @@ import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
 import { prisma } from "@/lib/prisma";
 import { requireUser, getHouseholdProfileView } from "@/lib/auth";
 import { findVillageOfficials } from "@/lib/officials";
-import { formatThaiDate } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 
 const DECISION_LABEL: Record<string, string> = { approved: "อนุมัติ", rejected: "ไม่อนุมัติ" };
 const DECISION_ICON: Record<string, typeof CheckCircle2> = { approved: CheckCircle2, rejected: XCircle };

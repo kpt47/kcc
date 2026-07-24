@@ -1,4 +1,5 @@
 import { documentShell, fill, signatureRow } from "../../layout";
+import { formatThaiDate } from "@/lib/formatDate";
 import type { Report1Row } from "@/lib/analytics";
 
 const STYLE = `
@@ -52,7 +53,7 @@ export function renderDistrictSummaryReportHtml(
       </p>
       <p class="center" style="margin: 2px 0 2px;">แบบฟอร์ม 26(1) สรุประดับอำเภอ — อำเภอ${districtName}</p>
       <p class="center" style="margin: 2px 0 10px;">
-        ข้อมูล ณ วันที่ ${generatedAt.toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" })}
+        ข้อมูล ณ วันที่ ${formatThaiDate(generatedAt)}
       </p>
 
       <table class="ledger">

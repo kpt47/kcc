@@ -1,5 +1,6 @@
 import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
 import { prisma } from "@/lib/prisma";
+import { formatThaiDateTime } from "@/lib/formatDate";
 import { requireUser } from "@/lib/auth";
 import { canViewAuditLog } from "@/lib/authz";
 
@@ -61,7 +62,7 @@ export default async function AuditLogsPage() {
                   {ACTION_LABELS[log.action] ?? log.action}
                 </span>
                 <span className="text-xs text-slate-500">
-                  {new Date(log.createdAt).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}
+                  {formatThaiDateTime(log.createdAt)}
                 </span>
               </div>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-700">

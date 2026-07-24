@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatThaiDate } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { THEMES } from "@/lib/theme";
 import { RepaymentAction } from "./RepaymentAction";
 import { RepaymentHistoryTable, type RepaymentHistoryRow } from "./RepaymentHistoryTable";

@@ -11,7 +11,8 @@ import { MoneyField } from "@/components/form/MoneyField";
 import { ThaiDateField } from "@/components/form/ThaiDateField";
 import { HouseholdSelect, type HouseholdOption } from "@/components/form/HouseholdSelect";
 import { loanRequestSchema, LOAN_REQUEST_STEP_FIELDS, type LoanRequestFormValues, type LoanRequestSubmitValues } from "@/lib/schemas";
-import { formatThaiDate, thaiBahtText } from "@/lib/thai";
+import { thaiBahtText } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { LOAN_CEILING_DEFAULT } from "@/lib/config";
 
 const STEPS = [

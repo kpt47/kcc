@@ -1,5 +1,6 @@
 import { documentShell, fill } from "../layout";
-import { formatThaiDate, thaiBahtText } from "@/lib/thai";
+import { thaiBahtText } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { villageAddress } from "@/lib/geo";
 import type { LoanForContractPdf } from "./loanContractPdf";
 

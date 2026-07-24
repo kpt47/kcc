@@ -1,5 +1,6 @@
 import { documentShell, fill, checkbox } from "../layout";
-import { formatThaiDate, thaiBahtText } from "@/lib/thai";
+import { thaiBahtText } from "@/lib/thai";
+import { formatThaiDate } from "@/lib/formatDate";
 import { VILLAGE_ADDRESS_INCLUDE, villageAddress } from "@/lib/geo";
 import type { Prisma } from "@/generated/prisma/client";
 
