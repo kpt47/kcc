@@ -125,6 +125,8 @@ export default async function ProfilePage() {
           role={user.role}
           phoneNumber={dbUser.phoneNumber}
           email={dbUser.email}
+          titlePrefix={committeeProfile?.titlePrefix ?? officialProfile?.titlePrefix}
+          titlePrefixOther={committeeProfile?.titlePrefixOther ?? officialProfile?.titlePrefixOther}
           firstName={committeeProfile?.firstName ?? officialProfile?.firstName}
           lastName={committeeProfile?.lastName ?? officialProfile?.lastName}
         />

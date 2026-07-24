@@ -34,8 +34,8 @@ export async function GET() {
       lineId: true,
       isActive: true,
       householdProfile: { select: { age: true, occupation: true, consentPersonName: true, consentRelation: true } },
-      committeeProfile: { select: { firstName: true, lastName: true } },
-      officialProfile: { select: { firstName: true, lastName: true } },
+      committeeProfile: { select: { titlePrefix: true, titlePrefixOther: true, firstName: true, lastName: true } },
+      officialProfile: { select: { titlePrefix: true, titlePrefixOther: true, firstName: true, lastName: true } },
       household: { select: { headFirstName: true, headLastName: true } },
       scopeVillage: { select: { villageName: true, villageNo: true } },
       scopeSubDistrict: { select: { name: true } },
@@ -152,6 +152,8 @@ export async function POST(request: Request) {
         targetRole === "VILLAGE_COMMITTEE"
           ? {
               create: {
+                titlePrefix: data.titlePrefix,
+                titlePrefixOther: data.titlePrefix === "OTHER" ? data.titlePrefixOther : undefined,
                 firstName: data.firstName,
                 lastName: data.lastName,
                 termStartDate: data.termStartDate ? new Date(data.termStartDate) : undefined,
@@ -163,6 +165,8 @@ export async function POST(request: Request) {
         targetRole !== "HOUSEHOLD" && targetRole !== "VILLAGE_COMMITTEE"
           ? {
               create: {
+                titlePrefix: data.titlePrefix,
+                titlePrefixOther: data.titlePrefix === "OTHER" ? data.titlePrefixOther : undefined,
                 firstName: data.firstName,
                 lastName: data.lastName,
                 positionTitle: data.positionTitle,

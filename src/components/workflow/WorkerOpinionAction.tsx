@@ -32,16 +32,20 @@ export function WorkerOpinionAction({
   id,
   kind,
   showRiskAssessment,
+  defaultWorkerName,
 }: {
   id: number;
   kind: Kind;
   showRiskAssessment?: boolean;
+  /** ชื่อพัฒนากรผู้รับผิดชอบ (คำนำหน้า+ชื่อ+เว้น 2 ตัวอักษร+นามสกุล) ของผู้ใช้ที่ล็อกอินอยู่ — เติมอัตโนมัติ
+   *  ในช่องนี้ (แก้ไขทับได้ตามปกติ) ให้พัฒนากรไม่ต้องพิมพ์ชื่อตัวเองซ้ำทุกครั้งที่ให้ความเห็น */
+  defaultWorkerName?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [opinion, setOpinion] = useState("");
   const [reason, setReason] = useState("");
-  const [workerName, setWorkerName] = useState("");
+  const [workerName, setWorkerName] = useState(defaultWorkerName ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 

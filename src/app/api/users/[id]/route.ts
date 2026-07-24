@@ -94,16 +94,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       : undefined;
 
   const committeeProfileUpdate =
-    target.role === "VILLAGE_COMMITTEE" && (data.firstName !== undefined || data.lastName !== undefined || data.termStartDate !== undefined || data.termEndDate !== undefined)
+    target.role === "VILLAGE_COMMITTEE" &&
+    (data.firstName !== undefined ||
+      data.lastName !== undefined ||
+      data.titlePrefix !== undefined ||
+      data.titlePrefixOther !== undefined ||
+      data.termStartDate !== undefined ||
+      data.termEndDate !== undefined)
       ? {
           upsert: {
             update: {
+              titlePrefix: data.titlePrefix,
+              titlePrefixOther: data.titlePrefix === "OTHER" ? data.titlePrefixOther : undefined,
               firstName: data.firstName,
               lastName: data.lastName,
               termStartDate: data.termStartDate ? new Date(data.termStartDate) : undefined,
               termEndDate: data.termEndDate ? new Date(data.termEndDate) : undefined,
             },
             create: {
+              titlePrefix: data.titlePrefix,
+              titlePrefixOther: data.titlePrefix === "OTHER" ? data.titlePrefixOther : undefined,
               firstName: data.firstName ?? "",
               lastName: data.lastName ?? "",
               termStartDate: data.termStartDate ? new Date(data.termStartDate) : undefined,
@@ -116,16 +126,25 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const officialProfileUpdate =
     target.role !== "HOUSEHOLD" &&
     target.role !== "VILLAGE_COMMITTEE" &&
-    (data.firstName !== undefined || data.lastName !== undefined || data.positionTitle !== undefined || data.handoverDate !== undefined)
+    (data.firstName !== undefined ||
+      data.lastName !== undefined ||
+      data.titlePrefix !== undefined ||
+      data.titlePrefixOther !== undefined ||
+      data.positionTitle !== undefined ||
+      data.handoverDate !== undefined)
       ? {
           upsert: {
             update: {
+              titlePrefix: data.titlePrefix,
+              titlePrefixOther: data.titlePrefix === "OTHER" ? data.titlePrefixOther : undefined,
               firstName: data.firstName,
               lastName: data.lastName,
               positionTitle: data.positionTitle,
               handoverDate: data.handoverDate ? new Date(data.handoverDate) : undefined,
             },
             create: {
+              titlePrefix: data.titlePrefix,
+              titlePrefixOther: data.titlePrefix === "OTHER" ? data.titlePrefixOther : undefined,
               firstName: data.firstName ?? "",
               lastName: data.lastName ?? "",
               positionTitle: data.positionTitle,

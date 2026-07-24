@@ -32,8 +32,11 @@ export async function PATCH(request: Request) {
   }
   const data = parsed.data;
 
-  // ครัวเรือน แก้ชื่อ-สกุลตนเองผ่านหน้านี้ไม่ได้ — HouseholdProfile ไม่มีฟิลด์ชื่อ (อยู่ที่ TargetHousehold)
-  if (user.role === "HOUSEHOLD" && (data.firstName !== undefined || data.lastName !== undefined)) {
+  // ครัวเรือน แก้ชื่อ-สกุล/คำนำหน้าตนเองผ่านหน้านี้ไม่ได้ — HouseholdProfile ไม่มีฟิลด์เหล่านี้ (อยู่ที่ TargetHousehold)
+  if (
+    user.role === "HOUSEHOLD" &&
+    (data.firstName !== undefined || data.lastName !== undefined || data.titlePrefix !== undefined || data.titlePrefixOther !== undefined)
+  ) {
     return NextResponse.json(
       { error: { formErrors: ["ครัวเรือนไม่สามารถแก้ไขชื่อผ่านหน้านี้ได้ กรุณาติดต่อพัฒนากร"] } },
       { status: 403 }
@@ -48,11 +51,21 @@ export async function PATCH(request: Request) {
   }
 
   const profileUpdate =
-    data.firstName !== undefined || data.lastName !== undefined
+    data.firstName !== undefined || data.lastName !== undefined || data.titlePrefix !== undefined || data.titlePrefixOther !== undefined
       ? {
           upsert: {
-            update: { firstName: data.firstName, lastName: data.lastName },
-            create: { firstName: data.firstName ?? "", lastName: data.lastName ?? "" },
+            update: {
+              firstName: data.firstName,
+              lastName: data.lastName,
+              titlePrefix: data.titlePrefix,
+              titlePrefixOther: data.titlePrefix === "OTHER" ? data.titlePrefixOther : undefined,
+            },
+            create: {
+              firstName: data.firstName ?? "",
+              lastName: data.lastName ?? "",
+              titlePrefix: data.titlePrefix,
+              titlePrefixOther: data.titlePrefix === "OTHER" ? data.titlePrefixOther : undefined,
+            },
           },
         }
       : undefined;

@@ -8,6 +8,7 @@ import { formatThaiDate } from "@/lib/formatDate";
 import { requireUser } from "@/lib/auth";
 import { canApproveProposalOrLoanRequest, canGiveWorkerOpinion, canViewRiskAssessment } from "@/lib/authz";
 import { getAllowedVillageIds, householdScopeWhere } from "@/lib/scope";
+import { formatOfficialName } from "@/lib/officials";
 
 const WORKER_OPINION_LABEL: Record<string, string> = {
   possible: "เป็นไปได้",
@@ -32,6 +33,15 @@ export default async function ProposalsPage() {
   const showWorkerOpinionAction = canGiveWorkerOpinion(user);
   const showApproveAction = canApproveProposalOrLoanRequest(user);
   const showRiskAssessment = canViewRiskAssessment(user);
+
+  // เติมชื่อผู้ใช้ปัจจุบันอัตโนมัติในช่อง "ชื่อพัฒนากรผู้รับผิดชอบ"/"ชื่อประธานคณะกรรมการ" (คำนำหน้า+ชื่อ+เว้น
+  // 2 ตัวอักษร+นามสกุล) — ไม่ต้องพิมพ์ชื่อตัวเองซ้ำทุกครั้งที่ให้ความเห็น/พิจารณาอนุมัติ (ยังแก้ไขทับได้ตามปกติ)
+  const [ownCommitteeProfile, ownOfficialProfile] = await Promise.all([
+    showApproveAction ? prisma.committeeProfile.findUnique({ where: { userId: user.id } }) : null,
+    showWorkerOpinionAction ? prisma.officialProfile.findUnique({ where: { userId: user.id } }) : null,
+  ]);
+  const defaultChairName = ownCommitteeProfile ? formatOfficialName(ownCommitteeProfile) : undefined;
+  const defaultWorkerName = ownOfficialProfile ? formatOfficialName(ownOfficialProfile) : undefined;
 
   return (
     <PageContainer title="แบบเสนอโครงการ" subtitle="รายการแบบเสนอโครงการของครัวเรือนเป้าหมายทั้งหมด">
@@ -90,10 +100,10 @@ export default async function ProposalsPage() {
                     <ProposalSelfEditAction id={p.id} projectName={p.projectName} totalAmount={p.totalAmount} proposedDate={p.proposedDate.toISOString()} />
                   )}
                   {showWorkerOpinionAction && !p.workerOpinion && (
-                    <WorkerOpinionAction id={p.id} kind="proposal" showRiskAssessment={showRiskAssessment} />
+                    <WorkerOpinionAction id={p.id} kind="proposal" showRiskAssessment={showRiskAssessment} defaultWorkerName={defaultWorkerName} />
                   )}
                   {showApproveAction && p.workerOpinion && !p.committeeDecision && (
-                    <ApproveAction id={p.id} kind="proposal" showRiskAssessment={showRiskAssessment} />
+                    <ApproveAction id={p.id} kind="proposal" showRiskAssessment={showRiskAssessment} defaultChairName={defaultChairName} />
                   )}
                 </div>
               ) : null}

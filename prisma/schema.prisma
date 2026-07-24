@@ -174,28 +174,32 @@ model HouseholdProfile {
 /// ข้อมูลส่วนบุคคลของผู้ใช้ role VILLAGE_COMMITTEE (1-to-1 กับ User)
 /// ไม่เก็บ committeeRole ซ้ำที่นี่ — ใช้ User.committeeRole เป็นแหล่งข้อมูลเดียวเพื่อไม่ให้ข้อมูลเพี้ยนกัน
 model CommitteeProfile {
-  id            Int       @id @default(autoincrement())
-  userId        Int       @unique
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName     String
-  lastName      String
-  termStartDate DateTime? // วันที่เริ่มวาระ
-  termEndDate   DateTime? // วันที่สิ้นสุดวาระ
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               Int          @id @default(autoincrement())
+  userId           Int          @unique
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  titlePrefix      TitlePrefix? // คำนำหน้านาม (นาย/นาง/นางสาว/อื่นๆ)
+  titlePrefixOther String? // ข้อความคำนำหน้าที่กรอกเอง — ใช้เมื่อ titlePrefix = OTHER เท่านั้น
+  firstName        String
+  lastName         String
+  termStartDate    DateTime? // วันที่เริ่มวาระ
+  termEndDate      DateTime? // วันที่สิ้นสุดวาระ
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 }
 
 /// ข้อมูลส่วนบุคคลของเจ้าหน้าที่รัฐ (SUB_DISTRICT_ADMIN ขึ้นไป) (1-to-1 กับ User)
 model OfficialProfile {
-  id            Int       @id @default(autoincrement())
-  userId        Int       @unique
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  firstName     String
-  lastName      String
-  positionTitle String? // ตำแหน่งทางการ
-  handoverDate  DateTime? // วันที่รับมอบงาน (อ้างอิงสมุดเล่มน้ำตาล)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               Int          @id @default(autoincrement())
+  userId           Int          @unique
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  titlePrefix      TitlePrefix? // คำนำหน้านาม (นาย/นาง/นางสาว/อื่นๆ)
+  titlePrefixOther String? // ข้อความคำนำหน้าที่กรอกเอง — ใช้เมื่อ titlePrefix = OTHER เท่านั้น
+  firstName        String
+  lastName         String
+  positionTitle    String? // ตำแหน่งทางการ
+  handoverDate     DateTime? // วันที่รับมอบงาน (อ้างอิงสมุดเล่มน้ำตาล)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 }
 
 /// ประเภทการแจ้งเตือนในระบบ (In-app Notification)

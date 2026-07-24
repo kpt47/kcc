@@ -16,17 +16,21 @@ export function ApproveAction({
   id,
   kind,
   showRiskAssessment,
+  defaultChairName,
 }: {
   id: number;
   kind: Kind;
   showRiskAssessment?: boolean;
+  /** ชื่อประธานคณะกรรมการ (คำนำหน้า+ชื่อ+เว้น 2 ตัวอักษร+นามสกุล) ของผู้ใช้ที่ล็อกอินอยู่ — เติมอัตโนมัติในช่องนี้
+   *  (แก้ไขทับได้ตามปกติ) ให้ประธานไม่ต้องพิมพ์ชื่อตัวเองซ้ำทุกครั้งที่พิจารณาอนุมัติ */
+  defaultChairName?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [decision, setDecision] = useState("");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
-  const [chairName, setChairName] = useState("");
+  const [chairName, setChairName] = useState(defaultChairName ?? "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 

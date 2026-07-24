@@ -53,68 +53,87 @@ export type LoginFormValues = z.infer<typeof loginSchema>;
 // ข้อมูลโปรไฟล์ที่แนบไปกับการสร้าง/แก้ไขผู้ใช้งาน — ฟิลด์ไหนใช้จริงขึ้นกับ role ปลายทาง
 // (HOUSEHOLD ใช้ age/occupation/consent*, VILLAGE_COMMITTEE ใช้ termStartDate/termEndDate,
 // role อื่นๆ (เจ้าหน้าที่รัฐ) ใช้ positionTitle/handoverDate) — ดู POST/PATCH /api/users
-export const createUserSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .min(3, "ชื่อผู้ใช้ต้องมีอย่างน้อย 3 ตัวอักษร")
-    .regex(USERNAME_REGEX, "ชื่อผู้ใช้ใช้ได้เฉพาะตัวอักษรภาษาอังกฤษ ตัวเลข . และ _"),
-  firstName: z.string().trim().min(1, "กรุณากรอกชื่อ"),
-  lastName: z.string().trim().min(1, "กรุณากรอกนามสกุล"),
-  password: z.string().min(8, "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร"),
-  phoneNumber: phoneNumberField(),
-  email: emailField(),
-  areaId: z.number().int().positive().optional(),
-  committeeRole: z.enum(["CHAIRMAN", "SECRETARY", "FINANCE_MEMBER", "NORMAL_MEMBER"]).optional(),
-  householdId: z.number().int().positive().optional(),
-  // HOUSEHOLD profile
-  age: z.number().int().min(0).max(150).optional(),
-  occupation: z.string().trim().optional(),
-  consentPersonName: z.string().trim().optional(),
-  consentRelation: z.string().trim().optional(),
-  // VILLAGE_COMMITTEE profile
-  termStartDate: z.string().optional(),
-  termEndDate: z.string().optional(),
-  // เจ้าหน้าที่รัฐ (OfficialProfile)
-  positionTitle: z.string().trim().optional(),
-  handoverDate: z.string().optional(),
-});
+// คำนำหน้านาม — ใช้ร่วมกันทั้ง CommitteeProfile/OfficialProfile (ผู้ใช้ทุก role ที่ไม่ใช่ HOUSEHOLD) เหมือนกับ
+// titlePrefix/titlePrefixOther ของ TargetHousehold (ครัวเรือนมีคำนำหน้าของตัวเองอยู่แล้วที่ทะเบียนครัวเรือน)
+const titlePrefixFields = {
+  titlePrefix: z.enum(["MR", "MRS", "MISS", "OTHER"]).optional(),
+  titlePrefixOther: z.string().trim().optional(),
+};
+function refineTitlePrefixOther<T extends { titlePrefix?: string; titlePrefixOther?: string }>(data: T) {
+  return data.titlePrefix !== "OTHER" || !!data.titlePrefixOther;
+}
+
+export const createUserSchema = z
+  .object({
+    username: z
+      .string()
+      .trim()
+      .min(3, "ชื่อผู้ใช้ต้องมีอย่างน้อย 3 ตัวอักษร")
+      .regex(USERNAME_REGEX, "ชื่อผู้ใช้ใช้ได้เฉพาะตัวอักษรภาษาอังกฤษ ตัวเลข . และ _"),
+    firstName: z.string().trim().min(1, "กรุณากรอกชื่อ"),
+    lastName: z.string().trim().min(1, "กรุณากรอกนามสกุล"),
+    password: z.string().min(8, "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร"),
+    phoneNumber: phoneNumberField(),
+    email: emailField(),
+    areaId: z.number().int().positive().optional(),
+    committeeRole: z.enum(["CHAIRMAN", "SECRETARY", "FINANCE_MEMBER", "NORMAL_MEMBER"]).optional(),
+    householdId: z.number().int().positive().optional(),
+    // HOUSEHOLD profile
+    age: z.number().int().min(0).max(150).optional(),
+    occupation: z.string().trim().optional(),
+    consentPersonName: z.string().trim().optional(),
+    consentRelation: z.string().trim().optional(),
+    // VILLAGE_COMMITTEE profile
+    ...titlePrefixFields,
+    termStartDate: z.string().optional(),
+    termEndDate: z.string().optional(),
+    // เจ้าหน้าที่รัฐ (OfficialProfile)
+    positionTitle: z.string().trim().optional(),
+    handoverDate: z.string().optional(),
+  })
+  .refine(refineTitlePrefixOther, { message: "กรุณากรอกคำนำหน้านาม", path: ["titlePrefixOther"] });
 export type CreateUserFormValues = z.infer<typeof createUserSchema>;
 
-export const editUserSchema = z.object({
-  firstName: z.string().trim().min(1, "กรุณากรอกชื่อ").optional(),
-  lastName: z.string().trim().min(1, "กรุณากรอกนามสกุล").optional(),
-  committeeRole: z.enum(["CHAIRMAN", "SECRETARY", "FINANCE_MEMBER", "NORMAL_MEMBER"]).optional(),
-  phoneNumber: phoneNumberField().optional(),
-  email: emailField().optional(),
-  lineId: z.string().optional(),
-  isActive: z.boolean().optional(),
-  age: z.number().int().min(0).max(150).optional(),
-  occupation: z.string().trim().optional(),
-  consentPersonName: z.string().trim().optional(),
-  consentRelation: z.string().trim().optional(),
-  termStartDate: z.string().optional(),
-  termEndDate: z.string().optional(),
-  positionTitle: z.string().trim().optional(),
-  handoverDate: z.string().optional(),
-});
+export const editUserSchema = z
+  .object({
+    firstName: z.string().trim().min(1, "กรุณากรอกชื่อ").optional(),
+    lastName: z.string().trim().min(1, "กรุณากรอกนามสกุล").optional(),
+    committeeRole: z.enum(["CHAIRMAN", "SECRETARY", "FINANCE_MEMBER", "NORMAL_MEMBER"]).optional(),
+    phoneNumber: phoneNumberField().optional(),
+    email: emailField().optional(),
+    lineId: z.string().optional(),
+    isActive: z.boolean().optional(),
+    age: z.number().int().min(0).max(150).optional(),
+    occupation: z.string().trim().optional(),
+    consentPersonName: z.string().trim().optional(),
+    consentRelation: z.string().trim().optional(),
+    ...titlePrefixFields,
+    termStartDate: z.string().optional(),
+    termEndDate: z.string().optional(),
+    positionTitle: z.string().trim().optional(),
+    handoverDate: z.string().optional(),
+  })
+  .refine(refineTitlePrefixOther, { message: "กรุณากรอกคำนำหน้านาม", path: ["titlePrefixOther"] });
 export type EditUserFormValues = z.infer<typeof editUserSchema>;
 
 // หน้า "บัญชีของฉัน" — ผู้ใช้แก้ไขข้อมูลติดต่อของตนเองได้เท่านั้น (ชื่อ-สกุลแก้ได้เฉพาะที่ไม่ใช่ HOUSEHOLD
 // เพราะชื่อครัวเรือนอ้างอิงจาก TargetHousehold ซึ่งแก้ผ่านหน้าทะเบียนครัวเรือนเท่านั้น ไม่ใช่หน้านี้)
-export const selfProfileSchema = z.object({
-  phoneNumber: phoneNumberField().optional(),
-  email: emailField().optional(),
-  lineId: z.string().optional(),
-  firstName: z.string().trim().min(1, "กรุณากรอกชื่อ").optional(),
-  lastName: z.string().trim().min(1, "กรุณากรอกนามสกุล").optional(),
-  // จำนวนวันล่วงหน้าก่อนครบกำหนดชำระที่ครัวเรือนต้องการรับแจ้งเตือน — เฉพาะ role HOUSEHOLD (ดู /api/profile)
-  reminderLeadDays: z
-    .number()
-    .int()
-    .refine((v) => (REMINDER_LEAD_DAY_OPTIONS as readonly number[]).includes(v), "กรุณาเลือกจำนวนวันที่ระบบรองรับ")
-    .optional(),
-});
+export const selfProfileSchema = z
+  .object({
+    phoneNumber: phoneNumberField().optional(),
+    email: emailField().optional(),
+    lineId: z.string().optional(),
+    firstName: z.string().trim().min(1, "กรุณากรอกชื่อ").optional(),
+    lastName: z.string().trim().min(1, "กรุณากรอกนามสกุล").optional(),
+    ...titlePrefixFields,
+    // จำนวนวันล่วงหน้าก่อนครบกำหนดชำระที่ครัวเรือนต้องการรับแจ้งเตือน — เฉพาะ role HOUSEHOLD (ดู /api/profile)
+    reminderLeadDays: z
+      .number()
+      .int()
+      .refine((v) => (REMINDER_LEAD_DAY_OPTIONS as readonly number[]).includes(v), "กรุณาเลือกจำนวนวันที่ระบบรองรับ")
+      .optional(),
+  })
+  .refine(refineTitlePrefixOther, { message: "กรุณากรอกคำนำหน้านาม", path: ["titlePrefixOther"] });
 export type SelfProfileFormValues = z.infer<typeof selfProfileSchema>;
 
 // ประธานกรรมการหมู่บ้านกำหนดวันเริ่มยืนยันยอดหนี้ประจำปี — /api/debt-confirmation/round

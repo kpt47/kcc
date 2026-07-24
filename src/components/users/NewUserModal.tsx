@@ -6,6 +6,7 @@ import { HouseholdSelect, type HouseholdOption } from "@/components/form/Househo
 import { AddressCombobox, type AddressOption } from "@/components/form/AddressCombobox";
 import { ThaiDateField } from "@/components/form/ThaiDateField";
 import { calculateAge } from "@/lib/thai";
+import { TITLE_PREFIX_OPTIONS } from "@/lib/schemas";
 import type { GlobalRole } from "@/generated/prisma/client";
 
 type AreaOption = { id: number; label: string };
@@ -43,6 +44,8 @@ export function NewUserModal() {
   const [areas, setAreas] = useState<CreatableAreas | null>(null);
 
   const [username, setUsername] = useState("");
+  const [titlePrefix, setTitlePrefix] = useState("");
+  const [titlePrefixOther, setTitlePrefixOther] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
@@ -91,6 +94,8 @@ export function NewUserModal() {
 
   function resetForm() {
     setUsername("");
+    setTitlePrefix("");
+    setTitlePrefixOther("");
     setFirstName("");
     setLastName("");
     setPassword("");
@@ -146,6 +151,8 @@ export function NewUserModal() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username,
+        titlePrefix: titlePrefix || undefined,
+        titlePrefixOther: titlePrefix === "OTHER" ? titlePrefixOther : undefined,
         firstName,
         lastName,
         password,
@@ -233,6 +240,33 @@ export function NewUserModal() {
               required
               className="min-h-11 rounded-lg border border-slate-300 px-3 text-sm"
             />
+            {areas.targetRole !== "HOUSEHOLD" && (
+              <div>
+                <select
+                  value={titlePrefix}
+                  onChange={(e) => setTitlePrefix(e.target.value)}
+                  required
+                  className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm"
+                >
+                  <option value="">-- เลือกคำนำหน้านาม --</option>
+                  {TITLE_PREFIX_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                {titlePrefix === "OTHER" && (
+                  <input
+                    type="text"
+                    placeholder="ระบุคำนำหน้านาม"
+                    value={titlePrefixOther}
+                    onChange={(e) => setTitlePrefixOther(e.target.value)}
+                    required
+                    className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm"
+                  />
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="text"

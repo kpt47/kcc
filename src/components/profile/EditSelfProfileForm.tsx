@@ -3,23 +3,32 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { TextField } from "@/components/form/TextField";
+import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { inputClassName } from "@/components/form/inputStyles";
+import { TITLE_PREFIX_OPTIONS } from "@/lib/schemas";
 
 export function EditSelfProfileForm({
   role,
   phoneNumber,
   email,
+  titlePrefix,
+  titlePrefixOther,
   firstName,
   lastName,
 }: {
   role: string;
   phoneNumber: string | null;
   email: string;
+  titlePrefix?: string | null;
+  titlePrefixOther?: string | null;
   firstName?: string;
   lastName?: string;
 }) {
   const router = useRouter();
   const [phone, setPhone] = useState(phoneNumber ?? "");
   const [mail, setMail] = useState(email ?? "");
+  const [prefix, setPrefix] = useState(titlePrefix ?? "");
+  const [prefixOther, setPrefixOther] = useState(titlePrefixOther ?? "");
   const [first, setFirst] = useState(firstName ?? "");
   const [last, setLast] = useState(lastName ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +48,8 @@ export function EditSelfProfileForm({
       body: JSON.stringify({
         phoneNumber: phone || undefined,
         email: mail || undefined,
+        titlePrefix: canEditName ? prefix || undefined : undefined,
+        titlePrefixOther: canEditName && prefix === "OTHER" ? prefixOther : undefined,
         firstName: canEditName ? first : undefined,
         lastName: canEditName ? last : undefined,
       }),
@@ -56,10 +67,25 @@ export function EditSelfProfileForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {canEditName && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <TextField label="ชื่อ" value={first} onChange={(e) => setFirst(e.target.value)} />
-          <TextField label="นามสกุล" value={last} onChange={(e) => setLast(e.target.value)} />
-        </div>
+        <>
+          <FieldWrapper label="คำนำหน้านาม">
+            <select value={prefix} onChange={(e) => setPrefix(e.target.value)} className={inputClassName(false)}>
+              <option value="">-- เลือกคำนำหน้านาม --</option>
+              {TITLE_PREFIX_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </FieldWrapper>
+          {prefix === "OTHER" && (
+            <TextField label="ระบุคำนำหน้านาม" required value={prefixOther} onChange={(e) => setPrefixOther(e.target.value)} />
+          )}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TextField label="ชื่อ" value={first} onChange={(e) => setFirst(e.target.value)} />
+            <TextField label="นามสกุล" value={last} onChange={(e) => setLast(e.target.value)} />
+          </div>
+        </>
       )}
       <TextField label="เบอร์โทรศัพท์" value={phone} onChange={(e) => setPhone(e.target.value)} hint="ใช้สำหรับส่ง SMS แจ้งเตือน" />
       <TextField

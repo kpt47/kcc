@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { confirmDialog } from "@/lib/confirmDialog";
 import { ThaiDateField } from "@/components/form/ThaiDateField";
+import { TITLE_PREFIX_OPTIONS } from "@/lib/schemas";
 
 const COMMITTEE_ROLE_OPTIONS = [
   { value: "CHAIRMAN", label: "ประธานคณะกรรมการ" },
@@ -43,8 +44,22 @@ function toDateInputValue(d: Date | string | null | undefined): string {
 }
 
 type HouseholdProfile = { age: number | null; occupation: string | null; consentPersonName: string | null; consentRelation: string | null } | null;
-type CommitteeProfile = { firstName: string; lastName: string; termStartDate: Date | string | null; termEndDate: Date | string | null } | null;
-type OfficialProfile = { firstName: string; lastName: string; positionTitle: string | null; handoverDate: Date | string | null } | null;
+type CommitteeProfile = {
+  titlePrefix: string | null;
+  titlePrefixOther: string | null;
+  firstName: string;
+  lastName: string;
+  termStartDate: Date | string | null;
+  termEndDate: Date | string | null;
+} | null;
+type OfficialProfile = {
+  titlePrefix: string | null;
+  titlePrefixOther: string | null;
+  firstName: string;
+  lastName: string;
+  positionTitle: string | null;
+  handoverDate: Date | string | null;
+} | null;
 
 export function EditUserAction({
   userId,
@@ -73,6 +88,10 @@ export function EditUserAction({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [titlePrefix, setTitlePrefix] = useState(committeeProfile?.titlePrefix ?? officialProfile?.titlePrefix ?? "");
+  const [titlePrefixOther, setTitlePrefixOther] = useState(
+    committeeProfile?.titlePrefixOther ?? officialProfile?.titlePrefixOther ?? ""
+  );
   const [firstName, setFirstName] = useState(committeeProfile?.firstName ?? officialProfile?.firstName ?? "");
   const [lastName, setLastName] = useState(committeeProfile?.lastName ?? officialProfile?.lastName ?? "");
   const [phone, setPhone] = useState(phoneNumber);
@@ -106,6 +125,8 @@ export function EditUserAction({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         committeeRole: isVillageCommittee ? role_ || undefined : undefined,
+        titlePrefix: role === "HOUSEHOLD" ? undefined : titlePrefix || undefined,
+        titlePrefixOther: role !== "HOUSEHOLD" && titlePrefix === "OTHER" ? titlePrefixOther : undefined,
         firstName: role === "HOUSEHOLD" ? undefined : firstName,
         lastName: role === "HOUSEHOLD" ? undefined : lastName,
         phoneNumber: phone,
@@ -224,6 +245,31 @@ export function EditUserAction({
                 </>
               ) : (
                 <>
+                  <div>
+                    <select
+                      value={titlePrefix}
+                      onChange={(e) => setTitlePrefix(e.target.value)}
+                      required
+                      className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm"
+                    >
+                      <option value="">-- เลือกคำนำหน้านาม --</option>
+                      {TITLE_PREFIX_OPTIONS.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    {titlePrefix === "OTHER" && (
+                      <input
+                        type="text"
+                        placeholder="ระบุคำนำหน้านาม"
+                        value={titlePrefixOther}
+                        onChange={(e) => setTitlePrefixOther(e.target.value)}
+                        required
+                        className="mt-2 min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm"
+                      />
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={firstName}

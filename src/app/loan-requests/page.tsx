@@ -8,6 +8,7 @@ import { formatThaiDate } from "@/lib/formatDate";
 import { requireUser } from "@/lib/auth";
 import { canApproveProposalOrLoanRequest, canGiveWorkerOpinion, canViewRiskAssessment } from "@/lib/authz";
 import { getAllowedVillageIds, householdScopeWhere } from "@/lib/scope";
+import { formatOfficialName } from "@/lib/officials";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,15 @@ export default async function LoanRequestsPage() {
   const showWorkerOpinionAction = canGiveWorkerOpinion(user);
   const showApproveAction = canApproveProposalOrLoanRequest(user);
   const showRiskAssessment = canViewRiskAssessment(user);
+
+  // เติมชื่อผู้ใช้ปัจจุบันอัตโนมัติในช่อง "ชื่อพัฒนากรผู้รับผิดชอบ"/"ชื่อประธานคณะกรรมการ" (คำนำหน้า+ชื่อ+เว้น
+  // 2 ตัวอักษร+นามสกุล) — ไม่ต้องพิมพ์ชื่อตัวเองซ้ำทุกครั้งที่ให้ความเห็น/พิจารณาอนุมัติ (ยังแก้ไขทับได้ตามปกติ)
+  const [ownCommitteeProfile, ownOfficialProfile] = await Promise.all([
+    showApproveAction ? prisma.committeeProfile.findUnique({ where: { userId: user.id } }) : null,
+    showWorkerOpinionAction ? prisma.officialProfile.findUnique({ where: { userId: user.id } }) : null,
+  ]);
+  const defaultChairName = ownCommitteeProfile ? formatOfficialName(ownCommitteeProfile) : undefined;
+  const defaultWorkerName = ownOfficialProfile ? formatOfficialName(ownOfficialProfile) : undefined;
 
   return (
     <PageContainer title="แบบขอยืมเงินทุน" subtitle="รายการแบบขอยืมเงินทุนของครัวเรือนเป้าหมายทั้งหมด">
@@ -91,10 +101,10 @@ export default async function LoanRequestsPage() {
                     <LoanRequestSelfEditAction id={r.id} requestedAmount={r.requestedAmount} requestDate={r.requestDate.toISOString()} />
                   )}
                   {showWorkerOpinionAction && !r.workerOpinion && (
-                    <WorkerOpinionAction id={r.id} kind="loan-request" showRiskAssessment={showRiskAssessment} />
+                    <WorkerOpinionAction id={r.id} kind="loan-request" showRiskAssessment={showRiskAssessment} defaultWorkerName={defaultWorkerName} />
                   )}
                   {showApproveAction && r.workerOpinion && !r.committeeDecision && (
-                    <ApproveAction id={r.id} kind="loan-request" showRiskAssessment={showRiskAssessment} />
+                    <ApproveAction id={r.id} kind="loan-request" showRiskAssessment={showRiskAssessment} defaultChairName={defaultChairName} />
                   )}
                 </div>
               ) : null}
