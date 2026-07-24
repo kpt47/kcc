@@ -44,6 +44,19 @@ export async function errorToast(message: string): Promise<void> {
   await Toast.fire({ icon: "error", title: message });
 }
 
+/** Popup แจ้งเตือนแบบปุ่มเดียว (ไม่มีปุ่มยกเลิก) — ใช้เมื่อเป็นข้อผิดพลาดที่ต้องแก้ไขก่อนเท่านั้น ไม่ใช่การถามยืนยันว่าจะดำเนินการต่อหรือไม่ */
+export async function alertDialog(options: { title: string; text: string; tone?: "danger" | "question" }): Promise<void> {
+  const Swal = (await import("sweetalert2")).default;
+  const danger = options.tone === "danger";
+  await Swal.fire({
+    title: options.title,
+    text: options.text,
+    icon: danger ? "warning" : "info",
+    confirmButtonText: "ตกลง",
+    confirmButtonColor: danger ? "#dc2626" : "#059669",
+  });
+}
+
 /** Popup แจ้งผลสำเร็จตรงกลางหน้าจอ (ต้องกดตกลงเพื่อปิด) — ใช้หลังบันทึกข้อมูลสำเร็จในฟอร์มที่กรอกต่อเนื่องหลายรายการ */
 export async function successAlert(message: string): Promise<void> {
   const Swal = (await import("sweetalert2")).default;

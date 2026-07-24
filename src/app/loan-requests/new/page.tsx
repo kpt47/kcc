@@ -15,6 +15,7 @@ import { loanRequestSchema, LOAN_REQUEST_STEP_FIELDS, type LoanRequestFormValues
 import { thaiBahtText, calculateAge } from "@/lib/thai";
 import { formatThaiDate } from "@/lib/formatDate";
 import { LOAN_CEILING_DEFAULT } from "@/lib/config";
+import { alertDialog, confirmDialog } from "@/lib/confirmDialog";
 
 const STEPS = [
   { title: "ข้อมูลผู้ขอยืม" },
@@ -123,7 +124,33 @@ function NewLoanRequestForm() {
   async function goNext() {
     const fieldNames = LOAN_REQUEST_STEP_FIELDS[step] as unknown as Path<LoanRequestFormValues>[];
     const valid = await trigger(fieldNames);
-    if (valid) setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    if (!valid) return;
+
+    // ขั้นตอน "จำนวนเงินที่ขอยืม": ถ้าอ้างอิงแบบเสนอโครงการที่อนุมัติแล้ว เตือนทันทีถ้ายอดที่กรอกไม่ตรงกับ
+    // วงเงินที่ประธานกรรมการอนุมัติไว้ — เกินวงเงิน: บล็อกให้แก้ไขก่อน (server จะปฏิเสธอยู่แล้ว แต่เตือนไว
+    // กว่าให้แก้ตั้งแต่ตรงนี้), น้อยกว่าวงเงิน: แค่ถามยืนยันเผื่อพิมพ์ผิด ยังเลือกยื่นน้อยกว่าที่อนุมัติได้ตามจริง
+    if (step === 1 && linkedProposal?.committeeAmount != null) {
+      const amount = values.requestedAmount;
+      const ceiling = linkedProposal.committeeAmount;
+      if (amount > ceiling) {
+        await alertDialog({
+          title: "วงเงินเกินกว่าที่อนุมัติ",
+          text: `วงเงินที่กรอก (${amount.toLocaleString("th-TH")} บาท) เกินกว่าวงเงินที่ประธานกรรมการอนุมัติไว้ในแบบเสนอโครงการนี้ (${ceiling.toLocaleString("th-TH")} บาท) กรุณาแก้ไขจำนวนเงินก่อนดำเนินการต่อ`,
+          tone: "danger",
+        });
+        return;
+      }
+      if (amount < ceiling) {
+        const proceed = await confirmDialog({
+          title: "ยอดเงินน้อยกว่าที่อนุมัติ",
+          text: `วงเงินที่กรอก (${amount.toLocaleString("th-TH")} บาท) น้อยกว่าวงเงินที่ประธานกรรมการอนุมัติไว้ (${ceiling.toLocaleString("th-TH")} บาท) ต้องการดำเนินการต่อด้วยยอดนี้หรือไม่?`,
+          confirmButtonText: "ดำเนินการต่อ",
+        });
+        if (!proceed) return;
+      }
+    }
+
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
 
   function goBack() {
