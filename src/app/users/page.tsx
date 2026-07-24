@@ -2,6 +2,7 @@ import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
 import { NewUserModal } from "@/components/users/NewUserModal";
 import { EditUserAction } from "@/components/users/EditUserAction";
 import { ResetPasswordAction } from "@/components/users/ResetPasswordAction";
+import { DataListView, type DataListColumnDef, type DataListRow } from "@/components/shared/DataListView";
 import { prisma } from "@/lib/prisma";
 import { computeDisplayName, requireUser, ROLE_LABELS, COMMITTEE_ROLE_LABELS } from "@/lib/auth";
 import { canManageTargetRole, getManagedUserWhere, isUserManager } from "@/lib/userManagement";
@@ -79,67 +80,130 @@ export default async function UsersPage() {
           ยังไม่มีผู้ใช้งานในความดูแลของคุณ
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {users.map((u) => {
-            const manageable = canManageTargetRole(user, u.role) && u.id !== user.id;
-            return (
-              <div key={u.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-base font-bold text-slate-900">
-                      {u.displayName} <span className="font-normal text-slate-400">({u.username})</span>
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      {ROLE_LABELS[u.role]}
-                      {u.committeeRole ? ` · ${COMMITTEE_ROLE_LABELS[u.committeeRole]}` : ""} · {areaLabel(u)}
-                    </p>
-                    <p className="text-sm text-slate-500">เบอร์โทรศัพท์: {u.phoneNumber}</p>
-                    <p className="text-sm text-slate-500">อีเมล: {u.email}</p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        u.isActive ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-700"
-                      }`}
-                    >
-                      {u.isActive ? "ใช้งานอยู่" : "ถูกระงับ"}
-                    </span>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                        u.pdpaConsents[0] ? "bg-sky-100 text-sky-800" : "bg-amber-100 text-amber-800"
-                      }`}
-                    >
-                      {u.pdpaConsents[0]
-                        ? `ยอมรับ PDPA แล้ว (${formatThaiDate(u.pdpaConsents[0].acceptedAt)})`
-                        : "ยังไม่ยอมรับ PDPA"}
-                    </span>
-                  </div>
-                </div>
+        (() => {
+          const columns: DataListColumnDef[] = [
+            { key: "username", label: "ชื่อผู้ใช้" },
+            { key: "displayName", label: "ชื่อ-สกุล" },
+            { key: "role", label: "บทบาท" },
+            { key: "area", label: "พื้นที่" },
+            { key: "phoneNumber", label: "โทรศัพท์" },
+            { key: "isActive", label: "สถานะ", align: "center" },
+            { key: "pdpa", label: "PDPA", align: "center" },
+            { key: "actions", label: "จัดการ" },
+          ];
 
-                {manageable && (
-                  <div className="mt-3 flex flex-col gap-2 border-t border-slate-100 pt-3">
-                    <div className="flex flex-wrap gap-2">
-                      <EditUserAction
-                        userId={u.id}
-                        displayName={u.displayName}
-                        role={u.role}
-                        committeeRole={u.committeeRole}
-                        phoneNumber={u.phoneNumber}
-                        email={u.email}
-                        isActive={u.isActive}
-                        isVillageCommittee={u.role === "VILLAGE_COMMITTEE"}
-                        householdProfile={u.householdProfile}
-                        committeeProfile={u.committeeProfile}
-                        officialProfile={u.officialProfile}
-                      />
-                      <ResetPasswordAction userId={u.id} />
+          const rows: DataListRow[] = users.map((u) => {
+            const manageable = canManageTargetRole(user, u.role) && u.id !== user.id;
+            const roleLabel = `${ROLE_LABELS[u.role]}${u.committeeRole ? ` · ${COMMITTEE_ROLE_LABELS[u.committeeRole]}` : ""}`;
+            const area = areaLabel(u);
+            const pdpaLabel = u.pdpaConsents[0]
+              ? `ยอมรับ PDPA แล้ว (${formatThaiDate(u.pdpaConsents[0].acceptedAt)})`
+              : "ยังไม่ยอมรับ PDPA";
+
+            const actions = manageable ? (
+              <div className="flex flex-wrap gap-2">
+                <EditUserAction
+                  userId={u.id}
+                  displayName={u.displayName}
+                  role={u.role}
+                  committeeRole={u.committeeRole}
+                  phoneNumber={u.phoneNumber}
+                  email={u.email}
+                  isActive={u.isActive}
+                  isVillageCommittee={u.role === "VILLAGE_COMMITTEE"}
+                  householdProfile={u.householdProfile}
+                  committeeProfile={u.committeeProfile}
+                  officialProfile={u.officialProfile}
+                />
+                <ResetPasswordAction userId={u.id} />
+              </div>
+            ) : null;
+
+            return {
+              key: u.id,
+              searchText: [u.username, u.displayName, roleLabel, area, u.phoneNumber, u.email].join(" ").toLowerCase(),
+              sortValues: {
+                username: u.username,
+                displayName: u.displayName,
+                role: roleLabel,
+                area,
+                phoneNumber: u.phoneNumber,
+                isActive: u.isActive ? 1 : 0,
+                pdpa: u.pdpaConsents[0] ? 1 : 0,
+              },
+              cells: {
+                username: u.username,
+                displayName: u.displayName,
+                role: roleLabel,
+                area,
+                phoneNumber: u.phoneNumber,
+                isActive: (
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      u.isActive ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-700"
+                    }`}
+                  >
+                    {u.isActive ? "ใช้งานอยู่" : "ถูกระงับ"}
+                  </span>
+                ),
+                pdpa: (
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                      u.pdpaConsents[0] ? "bg-sky-100 text-sky-800" : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {u.pdpaConsents[0] ? "ยอมรับแล้ว" : "ยังไม่ยอมรับ"}
+                  </span>
+                ),
+                actions,
+              },
+              card: (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-base font-bold text-slate-900">
+                        {u.displayName} <span className="font-normal text-slate-400">({u.username})</span>
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {roleLabel} · {area}
+                      </p>
+                      <p className="text-sm text-slate-500">เบอร์โทรศัพท์: {u.phoneNumber}</p>
+                      <p className="text-sm text-slate-500">อีเมล: {u.email}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          u.isActive ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-700"
+                        }`}
+                      >
+                        {u.isActive ? "ใช้งานอยู่" : "ถูกระงับ"}
+                      </span>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          u.pdpaConsents[0] ? "bg-sky-100 text-sky-800" : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {pdpaLabel}
+                      </span>
                     </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+
+                  {actions && <div className="mt-3 flex flex-col gap-2 border-t border-slate-100 pt-3">{actions}</div>}
+                </div>
+              ),
+            };
+          });
+
+          return (
+            <DataListView
+              rows={rows}
+              columns={columns}
+              defaultSortField="username"
+              searchPlaceholder="ค้นหาชื่อผู้ใช้, ชื่อ-สกุล, บทบาท, พื้นที่, เบอร์โทร, อีเมล..."
+              emptyMessage="ไม่พบผู้ใช้งานที่ตรงกับการค้นหานี้"
+            />
+          );
+        })()
       )}
     </PageContainer>
   );
