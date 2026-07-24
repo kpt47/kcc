@@ -43,3 +43,14 @@ export async function errorToast(message: string): Promise<void> {
   });
   await Toast.fire({ icon: "error", title: message });
 }
+
+/** Popup แจ้งผลสำเร็จตรงกลางหน้าจอ (ต้องกดตกลงเพื่อปิด) — ใช้หลังบันทึกข้อมูลสำเร็จในฟอร์มที่กรอกต่อเนื่องหลายรายการ */
+export async function successAlert(message: string): Promise<void> {
+  const Swal = (await import("sweetalert2")).default;
+  await Swal.fire({
+    icon: "success",
+    title: message,
+    confirmButtonText: "ตกลง",
+    confirmButtonColor: "#059669",
+  });
+}

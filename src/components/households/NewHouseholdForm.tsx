@@ -8,6 +8,7 @@ import { TextField } from "@/components/form/TextField";
 import { MoneyField } from "@/components/form/MoneyField";
 import { VillagePicker } from "@/components/form/VillagePicker";
 import { ThaiDateField } from "@/components/form/ThaiDateField";
+import { successAlert } from "@/lib/confirmDialog";
 import {
   householdSchema,
   TITLE_PREFIX_OPTIONS,
@@ -21,7 +22,6 @@ import {
 // ดูแลหลายหมู่บ้าน จึงยังต้องเลือกหมู่บ้านจาก VillagePicker ตามปกติ (ดู src/app/households/new/page.tsx)
 export function NewHouseholdForm({ lockedVillage }: { lockedVillage: { id: number; label: string } | null }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   const {
     register,
@@ -51,8 +51,8 @@ export function NewHouseholdForm({ lockedVillage }: { lockedVillage: { id: numbe
       );
       return;
     }
-    setSuccess(true);
     reset(lockedVillage ? { villageId: lockedVillage.id } : undefined);
+    await successAlert("บันทึกข้อมูลครัวเรือนเป้าหมายเรียบร้อยแล้ว ✓ กรอกรายการถัดไปได้เลย");
   }
 
   return (
@@ -60,12 +60,6 @@ export function NewHouseholdForm({ lockedVillage }: { lockedVillage: { id: numbe
       title="ลงทะเบียนครัวเรือนเป้าหมาย"
       subtitle="บัญชีทะเบียนครัวเรือนเป้าหมาย โครงการแก้ไขปัญหาความยากจน (กข.คจ.)"
     >
-      {success && (
-        <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
-          บันทึกข้อมูลครัวเรือนเป้าหมายเรียบร้อยแล้ว ✓ กรอกรายการถัดไปได้เลย
-        </div>
-      )}
-
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-5">
         <SectionCard title="หมู่บ้าน" description="ครัวเรือนนี้จะถูกบันทึกเข้าหมู่บ้านใด">
           {lockedVillage ? (
