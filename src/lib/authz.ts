@@ -337,9 +337,29 @@ export function isItSupportBlockedFromProgramData(user: Pick<CurrentUser, "role"
 export const IT_SUPPORT_DENIED_MESSAGE =
   "Access Denied: บัญชีผู้ดูแลระบบ (IT_SUPPORT) มีสิทธิ์เฉพาะการดูรายชื่อบัญชีผู้ใช้งานและตรวจสอบ Audit Log เท่านั้น ไม่มีสิทธิ์เข้าถึงข้อมูลสมุดทะเบียนโครงการ กข.คจ.";
 
-/** ดู Audit Log ของระบบ (SystemAuditLog) — เฉพาะส่วนกลาง (GLOBAL_ADMIN) และผู้ดูแลระบบ (IT_SUPPORT) เท่านั้น */
+/**
+ * ดู Audit Log ของระบบ (SystemAuditLog) — ส่วนกลาง (GLOBAL_ADMIN) และผู้ดูแลระบบ (IT_SUPPORT) เห็นได้ทั้งหมด
+ * ทุกพื้นที่ ส่วนพัฒนาการจังหวัด/อำเภอ/พัฒนากรตำบล เห็นได้เฉพาะเหตุการณ์ในพื้นที่ที่ตนรับผิดชอบ (ดู
+ * getAllowedVillageIds ใน lib/scope.ts — หน้า Audit Log กรองด้วย villageId ตามขอบเขตนั้น)
+ */
 export function canViewAuditLog(user: Pick<CurrentUser, "role">): boolean {
+  return (
+    user.role === "GLOBAL_ADMIN" ||
+    user.role === "IT_SUPPORT" ||
+    user.role === "PROVINCIAL_ADMIN" ||
+    user.role === "DISTRICT_ADMIN" ||
+    user.role === "SUB_DISTRICT_ADMIN"
+  );
+}
+
+/** ส่วนกลาง/IT_SUPPORT เห็นได้ทั้งระบบไม่จำกัดพื้นที่ (villageId ไม่ถูกกรอง) — role อื่นเห็นเฉพาะพื้นที่ตนเอง */
+export function auditLogSeesAllAreas(user: Pick<CurrentUser, "role">): boolean {
   return user.role === "GLOBAL_ADMIN" || user.role === "IT_SUPPORT";
+}
+
+/** จำนวนรายการ Audit Log สูงสุดที่มองเห็น/เปิดหน้าย้อนหลังได้ตาม role (ป้องกัน query หนักเกินไปเมื่อข้อมูลมาก) */
+export function auditLogRowCap(user: Pick<CurrentUser, "role">): number {
+  return auditLogSeesAllAreas(user) ? 250_000 : 25_000;
 }
 
 /**

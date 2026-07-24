@@ -253,6 +253,7 @@ model Village {
   assignments       VillageAssignment[]
   meetingRecords    VillageMeetingRecord[]
   debtConfirmationRounds DebtConfirmationRound[]
+  auditLogs         SystemAuditLog[]
 
   @@unique([villageNo, subDistrictId])
 }
@@ -717,6 +718,11 @@ model PasswordResetOtp {
 
 /// ประวัติเหตุการณ์ด้านความปลอดภัย (Login/OTP/CAPTCHA/LINE) — ใช้ตรวจสอบความผิดปกติย้อนหลัง
 /// userId/username เป็น null ได้ (เช่น พยายาม login ด้วย username ที่ไม่มีอยู่จริงในระบบ)
+/// villageId เติมอัตโนมัติจาก scopeVillageId ของผู้ใช้ที่ก่อเหตุการณ์ (เฉพาะ role ที่ผูกกับหมู่บ้านเดียว คือ
+/// VILLAGE_COMMITTEE/HOUSEHOLD) — ใช้เป็นขอบเขตให้พัฒนากรตำบล/ผู้บริหารอำเภอ/จังหวัด กรองดูเฉพาะพื้นที่ของตน
+/// (ดู logAuditEvent ใน lib/auditLog.ts และ canViewAuditLog/getAuditLogScope ใน lib/authz.ts)
+/// เหตุการณ์ที่ผู้ก่อเหตุเป็นระดับพัฒนากรตำบลขึ้นไปหรือ IT_SUPPORT จะมี villageId เป็น null — เห็นได้เฉพาะ
+/// ส่วนกลาง (GLOBAL_ADMIN) และ IT_SUPPORT เท่านั้น
 model SystemAuditLog {
   id        Int      @id @default(autoincrement())
   userId    Int?
@@ -725,7 +731,12 @@ model SystemAuditLog {
   action    String // เช่น "LOGIN_SUCCESS", "LOGIN_FAILED_CREDENTIALS", "LOGIN_FAILED_CAPTCHA", "FORGOT_PASSWORD_REQUESTED", "PASSWORD_RESET_SUCCESS", "PASSWORD_RESET_FAILED", "LINE_LINKED"
   detail    String?
   ipAddress String?
+  villageId Int?
+  village   Village? @relation(fields: [villageId], references: [id], onDelete: SetNull)
   createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([villageId])
 }
 
 /// หลักฐานการให้ความยินยอมตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล พ.ศ. 2562 (PDPA) ของผู้ใช้แต่ละคน

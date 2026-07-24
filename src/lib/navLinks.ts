@@ -25,7 +25,7 @@ import {
   Shield,
 } from "lucide-react";
 import { menusForRole } from "./dashboard";
-import { hasMinRole } from "./authz";
+import { hasMinRole, canViewAuditLog } from "./authz";
 import type { CurrentUser } from "./auth";
 
 export type NavLink = { href: string; label: string; icon: LucideIcon; iconColor?: string; group?: string };
@@ -173,7 +173,7 @@ export function getNavLinks(user: CurrentUser): NavLink[] {
     ...(hasMinRole(user, "GLOBAL_ADMIN")
       ? [{ href: "/master-data", label: "จัดการพื้นที่ (หมู่บ้าน)", icon: Settings, group: "admin" }]
       : []),
-    ...(role === "GLOBAL_ADMIN"
+    ...(canViewAuditLog(user)
       ? [{ href: "/admin/audit-logs", label: "Audit Logs", icon: ShieldCheck, group: "admin" }]
       : []),
     { href: "/about-program", label: "เกี่ยวกับโปรแกรม", icon: Info, group: "admin" },

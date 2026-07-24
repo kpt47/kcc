@@ -6,6 +6,7 @@ import { notifyUsers } from "./notifyUsers";
 import { recalculateLoanRiskStatuses } from "@/lib/risk";
 import { DEFAULT_REMINDER_LEAD_DAYS, MAX_REMINDER_LEAD_DAYS } from "@/lib/reminderSettings";
 import { formatThaiDate } from "@/lib/formatDate";
+import { deleteExpiredAuditLogs } from "@/lib/auditLog";
 
 function startOfDay(date: Date): Date {
   const d = new Date(date);
@@ -39,6 +40,7 @@ export type RepaymentCheckSummary = {
   householdOverdueNotifications: number;
   isFirstOfMonth: boolean;
   loanRiskStatusesUpdated: number;
+  expiredAuditLogsDeleted: number;
 };
 
 /**
@@ -60,6 +62,7 @@ export async function runDailyRepaymentCheck(now: Date = new Date()): Promise<Re
   const { officerNotifications: officerOverdueNotifications, householdNotifications: householdOverdueNotifications } =
     await sendOfficerOverdueAlerts(today);
   const loanRiskStatusesUpdated = await recalculateLoanRiskStatuses(now);
+  const expiredAuditLogsDeleted = await deleteExpiredAuditLogs(now);
 
   return {
     runAt: now.toISOString(),
@@ -69,6 +72,7 @@ export async function runDailyRepaymentCheck(now: Date = new Date()): Promise<Re
     householdOverdueNotifications,
     isFirstOfMonth,
     loanRiskStatusesUpdated,
+    expiredAuditLogsDeleted,
   };
 }
 
