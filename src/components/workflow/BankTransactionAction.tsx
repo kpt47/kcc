@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ThaiDateField } from "@/components/form/ThaiDateField";
+import { EvidenceUploadButton } from "./EvidenceUploadButton";
 
 export function BankTransactionAction({ bankAccountId }: { bankAccountId: number }) {
   const router = useRouter();
@@ -12,6 +13,7 @@ export function BankTransactionAction({ bankAccountId }: { bankAccountId: number
   const [description, setDescription] = useState("");
   const [transactionDate, setTransactionDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [documentNo, setDocumentNo] = useState("");
+  const [passbookImageUrl, setPassbookImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -29,6 +31,7 @@ export function BankTransactionAction({ bankAccountId }: { bankAccountId: number
         description,
         depositAmount: type === "deposit" ? Number(amount) : 0,
         withdrawAmount: type === "withdraw" ? Number(amount) : 0,
+        passbookImageUrl: passbookImageUrl || undefined,
       }),
     });
     setSubmitting(false);
@@ -41,6 +44,7 @@ export function BankTransactionAction({ bankAccountId }: { bankAccountId: number
     setAmount("");
     setDescription("");
     setDocumentNo("");
+    setPassbookImageUrl(null);
     router.refresh();
   }
 
@@ -95,6 +99,10 @@ export function BankTransactionAction({ bankAccountId }: { bankAccountId: number
         onChange={(e) => setDocumentNo(e.target.value)}
         className="min-h-9 rounded-lg border border-slate-300 px-2 text-sm"
       />
+      <div>
+        <p className="mb-1 text-xs font-semibold text-slate-500">รูปสมุดบัญชี/หลักฐานประกอบ (ถ้ามี)</p>
+        <EvidenceUploadButton url={passbookImageUrl} onUploaded={(url) => setPassbookImageUrl(url)} showPreview />
+      </div>
       {error && <p className="text-xs font-medium text-rose-600">{error}</p>}
       <div className="flex gap-2">
         <button
