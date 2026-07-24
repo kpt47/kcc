@@ -3,6 +3,7 @@ import { PageContainer, SectionCard } from "@/components/layout/PageContainer";
 import { HouseholdSearchBar } from "@/components/households/HouseholdSearchBar";
 import { SmartOmnibar } from "@/components/dashboard/SmartOmnibar";
 import { ImportHouseholdsModal } from "@/components/households/ImportHouseholdsModal";
+import { EditHouseholdAction } from "@/components/households/EditHouseholdAction";
 import { EntityListView, type EntityColumnDef, type EntityRow } from "@/components/shared/EntityListView";
 import { StarRating } from "@/components/shared/StarRating";
 import { getHouseholdStarRating } from "@/lib/rating";
@@ -13,6 +14,8 @@ import {
   canCreateHousehold,
   canImportHouseholds,
   canViewHouseholdPhoneNumber,
+  canEditHousehold,
+  canDeleteHousehold,
   isItSupportBlockedFromProgramData,
   IT_SUPPORT_DENIED_MESSAGE,
 } from "@/lib/authz";
@@ -39,6 +42,9 @@ export default async function HouseholdsPage() {
   const showCreateLink = canCreateHousehold(user);
   const showImport = canImportHouseholds(user);
   const showPhoneNumber = canViewHouseholdPhoneNumber(user);
+  const canEdit = canEditHousehold(user);
+  const canDelete = canDeleteHousehold(user);
+  const showActions = canEdit || canDelete;
   const households = await prisma.targetHousehold.findMany({
     where: householdSelfScopeWhere(user, scope),
     orderBy: [{ villageId: "asc" }, { sequenceNo: "asc" }],
@@ -99,10 +105,35 @@ export default async function HouseholdsPage() {
               { key: "incomeBeforeLoan", label: "รายได้ก่อนยืม", align: "right" },
               { key: "proposals", label: "แบบเสนอโครงการ", align: "center" },
               { key: "loanRequests", label: "แบบขอยืมเงินทุน", align: "center" },
+              ...(showActions ? [{ key: "actions", label: "จัดการ" } as EntityColumnDef] : []),
             ];
 
             const listRows: EntityRow[] = groupHouseholds.map((h) => {
               const rating = getHouseholdStarRating(h);
+              const editAction = showActions ? (
+                <EditHouseholdAction
+                  household={{
+                    id: h.id,
+                    displayName: `${h.headFirstName} ${h.headLastName}`,
+                    titlePrefix: h.titlePrefix,
+                    titlePrefixOther: h.titlePrefixOther,
+                    headFirstName: h.headFirstName,
+                    headLastName: h.headLastName,
+                    gender: h.gender,
+                    birthDate: h.birthDate ? h.birthDate.toISOString().slice(0, 10) : null,
+                    occupation: h.occupation,
+                    specialSkills: h.specialSkills,
+                    phoneNumber: h.phoneNumber,
+                    houseNo: h.houseNo,
+                    memberCount: h.memberCount,
+                    incomeBeforeLoan: h.incomeBeforeLoan,
+                    isDefaulted: h.isDefaulted,
+                    defaultedAmount: h.defaultedAmount,
+                  }}
+                  canEdit={canEdit}
+                  canDelete={canDelete}
+                />
+              ) : null;
               return {
               key: h.id,
               sortValues: {
@@ -134,6 +165,7 @@ export default async function HouseholdsPage() {
                 incomeBeforeLoan: h.incomeBeforeLoan != null ? `${h.incomeBeforeLoan.toLocaleString("th-TH")} บาท` : "-",
                 proposals: h._count.proposals,
                 loanRequests: h._count.loanRequests,
+                ...(showActions ? { actions: editAction } : {}),
               },
               card: (
                 <div className={`rounded-2xl border ${theme.cardBorder} ${theme.cardBg} p-4`}>
@@ -168,6 +200,7 @@ export default async function HouseholdsPage() {
                     <span>แบบเสนอโครงการ: {h._count.proposals} รายการ</span>
                     <span>แบบขอยืมเงินทุน: {h._count.loanRequests} รายการ</span>
                   </div>
+                  {showActions && <div className="mt-3">{editAction}</div>}
                 </div>
               ),
               };

@@ -74,12 +74,21 @@ export function canCreateHousehold(user: Pick<CurrentUser, "role" | "committeeRo
 }
 
 /**
- * บัญชีทะเบียนครัวเรือนเป้าหมาย (เล่มม่วง): แก้ไขรายได้ จปฐ. และลำดับที่ครัวเรือนเป้าหมาย —
- * เฉพาะพัฒนากรตำบล (SUB_DISTRICT_ADMIN) เท่านั้น แม้แต่อำเภอ/จังหวัด/ส่วนกลางก็แก้ไม่ได้
- * (ประธาน/เลขาฯ ทำได้แค่เพิ่มรายชื่อพื้นฐานผ่าน canCreateHousehold เท่านั้น)
+ * บัญชีทะเบียนครัวเรือนเป้าหมาย (เล่มม่วง): แก้ไขข้อมูลทุกฟิลด์ (รวมรายได้ จปฐ./ลำดับที่ครัวเรือนเป้าหมาย) —
+ * พัฒนากรตำบล (SUB_DISTRICT_ADMIN) หรือประธานคณะกรรมการหมู่บ้าน (CHAIRMAN) เท่านั้น แม้แต่อำเภอ/จังหวัด/
+ * ส่วนกลาง หรือเลขานุการ/ฝ่ายการเงิน/กรรมการทั่วไปก็แก้ไม่ได้ (เลขาฯ ทำได้แค่เพิ่มรายชื่อพื้นฐานผ่าน canCreateHousehold)
  */
-export function canEditHousehold(user: Pick<CurrentUser, "role">): boolean {
-  return user.role === "SUB_DISTRICT_ADMIN";
+export function canEditHousehold(user: Pick<CurrentUser, "role" | "committeeRole">): boolean {
+  return user.role === "SUB_DISTRICT_ADMIN" || user.committeeRole === "CHAIRMAN";
+}
+
+/**
+ * บัญชีทะเบียนครัวเรือนเป้าหมาย (เล่มม่วง): ลบทะเบียน — เฉพาะประธานคณะกรรมการหมู่บ้าน (CHAIRMAN) ของหมู่บ้านนั้น
+ * เท่านั้น (ตรวจสอบขอบเขตหมู่บ้านแยกที่ scope.ts ตามปกติ) ลบไม่ได้หากครัวเรือนมีประวัติเงินยืม/แบบเสนอโครงการ/
+ * แบบขอยืมเงินทุน/บัญชีผู้ใช้งานผูกอยู่แล้ว (ตรวจสอบที่ฝั่ง API ก่อนลบเสมอ เพื่อกันข้อมูลกำพร้า)
+ */
+export function canDeleteHousehold(user: Pick<CurrentUser, "role" | "committeeRole">): boolean {
+  return user.committeeRole === "CHAIRMAN";
 }
 
 /**

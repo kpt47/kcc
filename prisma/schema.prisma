@@ -307,7 +307,7 @@ model TargetHousehold {
 model HouseholdIncomeRecord {
   id             Int             @id @default(autoincrement())
   householdId    Int
-  household      TargetHousehold @relation(fields: [householdId], references: [id])
+  household      TargetHousehold @relation(fields: [householdId], references: [id], onDelete: Cascade)
   yearsAfterLoan Int // ภายหลังรับเงินยืม 1 / 2 / 3 ปี
   income         Float // รายได้เฉลี่ยต่อคนต่อปี (บาท)
 
