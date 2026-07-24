@@ -3,10 +3,16 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { WorkerOpinionAction } from "@/components/workflow/WorkerOpinionAction";
 import { ApproveAction } from "@/components/workflow/ApproveAction";
 import { LoanRequestSelfEditAction } from "@/components/workflow/LoanRequestSelfEditAction";
+import { LoanRequestManageAction } from "@/components/workflow/LoanRequestManageAction";
 import { prisma } from "@/lib/prisma";
 import { formatThaiDate } from "@/lib/formatDate";
 import { requireUser } from "@/lib/auth";
-import { canApproveProposalOrLoanRequest, canGiveWorkerOpinion, canViewRiskAssessment } from "@/lib/authz";
+import {
+  canApproveProposalOrLoanRequest,
+  canGiveWorkerOpinion,
+  canViewRiskAssessment,
+  canManageProposalOrLoanRequestRecord,
+} from "@/lib/authz";
 import { getAllowedVillageIds, householdScopeWhere } from "@/lib/scope";
 import { formatOfficialName } from "@/lib/officials";
 
@@ -33,6 +39,7 @@ export default async function LoanRequestsPage() {
   const showWorkerOpinionAction = canGiveWorkerOpinion(user);
   const showApproveAction = canApproveProposalOrLoanRequest(user);
   const showRiskAssessment = canViewRiskAssessment(user);
+  const showManageAction = canManageProposalOrLoanRequestRecord(user);
 
   // เติมชื่อผู้ใช้ปัจจุบันอัตโนมัติในช่อง "ชื่อพัฒนากรผู้รับผิดชอบ"/"ชื่อประธานคณะกรรมการ" (คำนำหน้า+ชื่อ+เว้น
   // 2 ตัวอักษร+นามสกุล) — ไม่ต้องพิมพ์ชื่อตัวเองซ้ำทุกครั้งที่ให้ความเห็น/พิจารณาอนุมัติ (ยังแก้ไขทับได้ตามปกติ)
@@ -95,7 +102,8 @@ export default async function LoanRequestsPage() {
               </div>
               {(user.role === "HOUSEHOLD" && !r.workerOpinion) ||
               (showWorkerOpinionAction && !r.workerOpinion) ||
-              (showApproveAction && r.workerOpinion && !r.committeeDecision) ? (
+              (showApproveAction && r.workerOpinion && !r.committeeDecision) ||
+              showManageAction ? (
                 <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                   {user.role === "HOUSEHOLD" && !r.workerOpinion && (
                     <LoanRequestSelfEditAction id={r.id} requestedAmount={r.requestedAmount} requestDate={r.requestDate.toISOString()} />
@@ -111,6 +119,9 @@ export default async function LoanRequestsPage() {
                       defaultChairName={defaultChairName}
                       approvalCeiling={r.proposal?.committeeAmount ?? undefined}
                     />
+                  )}
+                  {showManageAction && (
+                    <LoanRequestManageAction id={r.id} requestedAmount={r.requestedAmount} requestDate={r.requestDate.toISOString()} />
                   )}
                 </div>
               ) : null}

@@ -3,10 +3,16 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { WorkerOpinionAction } from "@/components/workflow/WorkerOpinionAction";
 import { ApproveAction } from "@/components/workflow/ApproveAction";
 import { ProposalSelfEditAction } from "@/components/workflow/ProposalSelfEditAction";
+import { ProposalManageAction } from "@/components/workflow/ProposalManageAction";
 import { prisma } from "@/lib/prisma";
 import { formatThaiDate } from "@/lib/formatDate";
 import { requireUser } from "@/lib/auth";
-import { canApproveProposalOrLoanRequest, canGiveWorkerOpinion, canViewRiskAssessment } from "@/lib/authz";
+import {
+  canApproveProposalOrLoanRequest,
+  canGiveWorkerOpinion,
+  canViewRiskAssessment,
+  canManageProposalOrLoanRequestRecord,
+} from "@/lib/authz";
 import { getAllowedVillageIds, householdScopeWhere } from "@/lib/scope";
 import { formatOfficialName } from "@/lib/officials";
 
@@ -33,6 +39,7 @@ export default async function ProposalsPage() {
   const showWorkerOpinionAction = canGiveWorkerOpinion(user);
   const showApproveAction = canApproveProposalOrLoanRequest(user);
   const showRiskAssessment = canViewRiskAssessment(user);
+  const showManageAction = canManageProposalOrLoanRequestRecord(user);
 
   // เติมชื่อผู้ใช้ปัจจุบันอัตโนมัติในช่อง "ชื่อพัฒนากรผู้รับผิดชอบ"/"ชื่อประธานคณะกรรมการ" (คำนำหน้า+ชื่อ+เว้น
   // 2 ตัวอักษร+นามสกุล) — ไม่ต้องพิมพ์ชื่อตัวเองซ้ำทุกครั้งที่ให้ความเห็น/พิจารณาอนุมัติ (ยังแก้ไขทับได้ตามปกติ)
@@ -94,7 +101,8 @@ export default async function ProposalsPage() {
               </div>
               {(user.role === "HOUSEHOLD" && !p.workerOpinion) ||
               (showWorkerOpinionAction && !p.workerOpinion) ||
-              (showApproveAction && p.workerOpinion && !p.committeeDecision) ? (
+              (showApproveAction && p.workerOpinion && !p.committeeDecision) ||
+              showManageAction ? (
                 <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
                   {user.role === "HOUSEHOLD" && !p.workerOpinion && (
                     <ProposalSelfEditAction id={p.id} projectName={p.projectName} totalAmount={p.totalAmount} proposedDate={p.proposedDate.toISOString()} />
@@ -104,6 +112,9 @@ export default async function ProposalsPage() {
                   )}
                   {showApproveAction && p.workerOpinion && !p.committeeDecision && (
                     <ApproveAction id={p.id} kind="proposal" showRiskAssessment={showRiskAssessment} defaultChairName={defaultChairName} />
+                  )}
+                  {showManageAction && (
+                    <ProposalManageAction id={p.id} projectName={p.projectName} totalAmount={p.totalAmount} proposedDate={p.proposedDate.toISOString()} />
                   )}
                 </div>
               ) : null}

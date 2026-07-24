@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { proposalSelfEditSchema } from "@/lib/schemas";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccessHouseholdRecord, getAllowedVillageIds } from "@/lib/scope";
-import { ACCESS_DENIED_MESSAGE } from "@/lib/authz";
+import { ACCESS_DENIED_MESSAGE, canManageProposalOrLoanRequestRecord } from "@/lib/authz";
 
 // แบบฟอร์ม 1 (แบบเสนอโครงการ): ครัวเรือนดึงข้อมูลโครงการที่ตนเองอนุมัติแล้วมาใช้อ้างอิงตอนยื่นแบบขอยืมเงินทุน
 // (เล่มที่/โครงการที่/วงเงินที่อนุมัติ) — ดู /loan-requests/new?proposalId=... และ POST /api/loan-requests
@@ -62,13 +62,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   });
 }
 
-// แบบฟอร์ม 1 (แบบเสนอโครงการ): ครัวเรือนแก้ไขคำร้องของตนเองได้ เฉพาะก่อนที่พัฒนากรจะให้ความเห็น
-// (workerOpinion ยังเป็นค่าว่าง) — หลังจากนั้นกระบวนการเดินหน้าไปแล้ว แก้ไขไม่ได้อีก
+// แบบฟอร์ม 1 (แบบเสนอโครงการ): ครัวเรือนแก้ไขคำร้องของตนเองได้ เฉพาะก่อนที่พัฒนากรจะให้ความเห็น (workerOpinion
+// ยังเป็นค่าว่าง) — ส่วนพัฒนาการอำเภอ พัฒนากรตำบล และประธานคณะกรรมการหมู่บ้าน แก้ไขได้ทุกเมื่อไม่มีเงื่อนไขล็อก
+// (ดู canManageProposalOrLoanRequestRecord) เผื่อกรณีต้องแก้ไขข้อมูลที่กรอกผิดพลาดหลังกระบวนการดำเนินไปแล้ว
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: { formErrors: ["กรุณาเข้าสู่ระบบ"] } }, { status: 401 });
 
-  if (user.role !== "HOUSEHOLD") {
+  const isHousehold = user.role === "HOUSEHOLD";
+  const isStaffManager = canManageProposalOrLoanRequestRecord(user);
+  if (!isHousehold && !isStaffManager) {
     return NextResponse.json({ error: { formErrors: [ACCESS_DENIED_MESSAGE] } }, { status: 403 });
   }
 
@@ -86,7 +89,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: { formErrors: ["ไม่พบแบบเสนอโครงการที่ระบุ"] } }, { status: 404 });
   }
 
-  if (proposal.workerOpinion) {
+  if (isHousehold && proposal.workerOpinion) {
     return NextResponse.json(
       { error: { formErrors: ["พัฒนากรให้ความเห็นแล้ว ไม่สามารถแก้ไขคำร้องนี้ได้อีก"] } },
       { status: 409 }
@@ -129,4 +132,39 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   });
 
   return NextResponse.json(updated);
+}
+
+// ลบแบบเสนอโครงการ — เฉพาะพัฒนาการอำเภอ พัฒนากรตำบล และประธานคณะกรรมการหมู่บ้าน ป้องกันไม่ให้ลบถ้ามีแบบขอยืม
+// เงินทุนอ้างอิงโครงการนี้อยู่แล้ว (ต้องลบแบบขอยืมเงินทุนนั้นก่อน กันข้อมูลที่ยังใช้งานอยู่หายไปโดยไม่ตั้งใจ)
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: { formErrors: ["กรุณาเข้าสู่ระบบ"] } }, { status: 401 });
+
+  if (!canManageProposalOrLoanRequestRecord(user)) {
+    return NextResponse.json({ error: { formErrors: [ACCESS_DENIED_MESSAGE] } }, { status: 403 });
+  }
+
+  const { id } = await params;
+  const proposal = await prisma.projectProposal.findUnique({
+    where: { id: Number(id) },
+    include: { household: true, loanRequests: { select: { id: true } } },
+  });
+  if (!proposal) {
+    return NextResponse.json({ error: { formErrors: ["ไม่พบแบบเสนอโครงการที่ระบุ"] } }, { status: 404 });
+  }
+
+  const scope = await getAllowedVillageIds(user);
+  if (!canAccessHouseholdRecord(user, scope, proposal.household)) {
+    return NextResponse.json({ error: { formErrors: ["ไม่พบแบบเสนอโครงการที่ระบุ"] } }, { status: 404 });
+  }
+
+  if (proposal.loanRequests.length > 0) {
+    return NextResponse.json(
+      { error: { formErrors: ["ไม่สามารถลบได้ เนื่องจากมีแบบขอยืมเงินทุนอ้างอิงแบบเสนอโครงการนี้อยู่ กรุณาลบแบบขอยืมเงินทุนนั้นก่อน"] } },
+      { status: 409 }
+    );
+  }
+
+  await prisma.projectProposal.delete({ where: { id: proposal.id } });
+  return NextResponse.json({ ok: true });
 }
