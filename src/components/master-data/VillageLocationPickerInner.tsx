@@ -36,8 +36,9 @@ export function VillageLocationPickerInner({
   const hasPin = latitude != null && longitude != null;
   const center: [number, number] = hasPin ? [latitude, longitude] : DEFAULT_CENTER;
 
+  // isolate กัน z-index ภายในของ Leaflet (สูงสุด 1000) หลุดออกไปทับ dropdown ของฟอร์ม (AddressCombobox z-50) ที่อยู่ในหน้าเดียวกัน
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-300" style={{ height: 220 }}>
+    <div className="isolate overflow-hidden rounded-xl border border-slate-300" style={{ height: 220 }}>
       {/* key={hasPin} บังคับให้ MapContainer สร้างใหม่เมื่อพิกัดเปลี่ยนจาก "ยังไม่มี" เป็น "มีแล้ว" (หรือกลับกัน)
           เพื่อให้ center/zoom เริ่มต้นใหม่ถูกต้อง — react-leaflet ไม่รองรับการเปลี่ยน center ผ่าน prop หลัง mount */}
       <MapContainer key={String(hasPin)} center={center} zoom={hasPin ? PINNED_ZOOM : DEFAULT_ZOOM} style={{ height: "100%", width: "100%" }}>

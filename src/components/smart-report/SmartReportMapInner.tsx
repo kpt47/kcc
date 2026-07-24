@@ -66,7 +66,8 @@ export function SmartReportMapInner({
           กรอบประแดง = เงินทุนต้นทุนต่ำกว่าเกณฑ์ {GOVERNMENT_FUND_PRINCIPAL.toLocaleString("th-TH")} บาท (เสี่ยงเงินทุนหาย)
         </span>
       </div>
-      <div className="overflow-hidden rounded-2xl border border-slate-200" style={{ height: 480 }}>
+      {/* isolate กัน z-index ภายในของ Leaflet หลุดออกไปทับ dropdown/เมนูอื่นในหน้าเดียวกัน */}
+      <div className="isolate overflow-hidden rounded-2xl border border-slate-200" style={{ height: 480 }}>
         <MapContainer center={center} zoom={villages.length > 0 ? 10 : 6} style={{ height: "100%", width: "100%" }}>
           <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           {villages.map((v) => (

@@ -81,7 +81,8 @@ export function FundingSourcesMapInner({
             </span>
           ))}
       </div>
-      <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800" style={{ height: 480 }}>
+      {/* isolate กัน z-index ภายในของ Leaflet หลุดออกไปทับ dropdown/เมนูอื่นในหน้าเดียวกัน */}
+      <div className="isolate overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800" style={{ height: 480 }}>
         <MapContainer center={center} zoom={9} style={{ height: "100%", width: "100%" }}>
           <TileLayer attribution="&copy; OpenStreetMap contributors" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
           <Circle center={center} radius={radiusKm * 1000} pathOptions={{ color: "#64748b", weight: 1, fillOpacity: 0.03 }} />

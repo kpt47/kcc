@@ -83,7 +83,8 @@ export function OverviewReportMapInner({
         <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-full" style={{ background: RISK_COLOR.highRisk }} />เสี่ยงสูง</span>
         <span className="flex items-center gap-1"><span className="inline-block h-3 w-3 rounded-full" style={{ background: NO_DATA_COLOR }} />ไม่มีข้อมูล</span>
       </div>
-      <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800" style={{ height: 520 }}>
+      {/* isolate กัน z-index ภายในของ Leaflet หลุดออกไปทับ dropdown/เมนูอื่นในหน้าเดียวกัน */}
+      <div className="isolate overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800" style={{ height: 520 }}>
         <MapContainer
           key={JSON.stringify(geoJson.features.map((f) => f.properties?.code))}
           bounds={bounds}
