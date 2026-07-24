@@ -12,6 +12,7 @@ export type HouseholdOption = {
   houseNo: string | null;
   birthDate: string | null;
   occupation: string | null;
+  phoneNumber: string | null;
   consentPersonName: string | null;
   consentRelation: string | null;
   village: {

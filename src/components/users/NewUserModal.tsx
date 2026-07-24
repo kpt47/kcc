@@ -73,8 +73,8 @@ export function NewUserModal() {
       .then((data) => setAreas(data));
   }, [open]);
 
-  // เลือกครัวเรือนเป้าหมายแล้ว: เติมชื่อ/นามสกุล/อายุ (คำนวณจากวันเกิด)/อาชีพ/ผู้ให้ความยินยอม/ความสัมพันธ์
-  // ให้อัตโนมัติจากข้อมูลที่มีอยู่แล้วในทะเบียนครัวเรือน — ยกเว้นชื่อผู้ใช้/รหัสผ่าน/อีเมล ยังต้องกรอกเองเสมอ
+  // เลือกครัวเรือนเป้าหมายแล้ว: เติมชื่อ/นามสกุล/อายุ (คำนวณจากวันเกิด)/อาชีพ/เบอร์โทรศัพท์/ผู้ให้ความยินยอม/
+  // ความสัมพันธ์ ให้อัตโนมัติจากข้อมูลที่มีอยู่แล้วในทะเบียนครัวเรือน — ยกเว้นชื่อผู้ใช้/รหัสผ่าน/อีเมล ยังต้องกรอกเองเสมอ
   // (ยังแก้ไขทับค่าที่เติมมาได้ตามปกติ เผื่อครัวเรือนยังไม่มีข้อมูลบางส่วน หรือข้อมูลเปลี่ยนไปแล้ว)
   function handleSelectHousehold(household: HouseholdOption | undefined) {
     setHouseholdId(household?.id);
@@ -84,6 +84,7 @@ export function NewUserModal() {
     const computedAge = calculateAge(household.birthDate);
     if (computedAge !== undefined) setAge(String(computedAge));
     if (household.occupation) setOccupation(household.occupation);
+    if (household.phoneNumber) setPhoneNumber(household.phoneNumber);
     if (household.consentPersonName) setConsentPersonName(household.consentPersonName);
     if (household.consentRelation) setConsentRelation(household.consentRelation);
   }

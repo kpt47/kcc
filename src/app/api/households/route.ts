@@ -3,12 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { householdSchema } from "@/lib/schemas";
 import { getCurrentUser } from "@/lib/auth";
 import { getAllowedVillageIds, householdSelfScopeWhere } from "@/lib/scope";
-import { ACCESS_DENIED_MESSAGE, canCreateHousehold } from "@/lib/authz";
+import { ACCESS_DENIED_MESSAGE, canCreateHousehold, canViewHouseholdPhoneNumber } from "@/lib/authz";
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: { formErrors: ["กรุณาเข้าสู่ระบบ"] } }, { status: 401 });
   const scope = await getAllowedVillageIds(user);
+  const showPhoneNumber = canViewHouseholdPhoneNumber(user);
 
   const households = await prisma.targetHousehold.findMany({
     where: householdSelfScopeWhere(user, scope),
@@ -21,6 +22,7 @@ export async function GET() {
       houseNo: true,
       birthDate: true,
       occupation: true,
+      phoneNumber: true,
       village: {
         select: {
           villageName: true,
@@ -45,6 +47,7 @@ export async function GET() {
 
   const result = households.map(({ users, ...h }) => ({
     ...h,
+    phoneNumber: showPhoneNumber ? h.phoneNumber : null,
     consentPersonName: users[0]?.householdProfile?.consentPersonName ?? null,
     consentRelation: users[0]?.householdProfile?.consentRelation ?? null,
   }));
