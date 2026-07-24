@@ -28,7 +28,7 @@ export default async function LoanRequestsPage() {
   const requests = await prisma.loanRequest.findMany({
     where: householdScopeWhere(user, scope),
     orderBy: { createdAt: "desc" },
-    include: { household: { include: { village: true } } },
+    include: { household: { include: { village: true } }, proposal: { select: { committeeAmount: true } } },
   });
   const showWorkerOpinionAction = canGiveWorkerOpinion(user);
   const showApproveAction = canApproveProposalOrLoanRequest(user);
@@ -104,7 +104,13 @@ export default async function LoanRequestsPage() {
                     <WorkerOpinionAction id={r.id} kind="loan-request" showRiskAssessment={showRiskAssessment} defaultWorkerName={defaultWorkerName} />
                   )}
                   {showApproveAction && r.workerOpinion && !r.committeeDecision && (
-                    <ApproveAction id={r.id} kind="loan-request" showRiskAssessment={showRiskAssessment} defaultChairName={defaultChairName} />
+                    <ApproveAction
+                      id={r.id}
+                      kind="loan-request"
+                      showRiskAssessment={showRiskAssessment}
+                      defaultChairName={defaultChairName}
+                      approvalCeiling={r.proposal?.committeeAmount ?? undefined}
+                    />
                   )}
                 </div>
               ) : null}

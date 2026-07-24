@@ -4,6 +4,7 @@ import { loanRequestSelfEditSchema } from "@/lib/schemas";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccessHouseholdRecord, getAllowedVillageIds } from "@/lib/scope";
 import { ACCESS_DENIED_MESSAGE } from "@/lib/authz";
+import { computeRepaymentDueDate } from "@/lib/loanSchedule";
 
 // แบบฟอร์ม 2 (แบบขอยืมเงินทุน): ครัวเรือนแก้ไขคำร้องของตนเองได้ เฉพาะก่อนที่พัฒนากรจะให้ความเห็น
 // (workerOpinion ยังเป็นค่าว่าง) — หลังจากนั้นกระบวนการเดินหน้าไปแล้ว แก้ไขไม่ได้อีก
@@ -43,6 +44,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
   const data = parsed.data;
 
+  const newRequestDate = data.requestDate ? new Date(data.requestDate) : undefined;
   const updated = await prisma.loanRequest.update({
     where: { id: loanRequest.id },
     data: {
@@ -50,7 +52,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       occupation: data.occupation,
       requestedAmount: data.requestedAmount,
       spouseConsentName: data.spouseConsentName,
-      requestDate: data.requestDate ? new Date(data.requestDate) : undefined,
+      requestDate: newRequestDate,
+      paymentDayOfMonth: data.paymentDayOfMonth,
+      // วันที่ยื่นคำขอเปลี่ยน ต้องคำนวณวันครบกำหนดชำระใหม่ตามไปด้วยเสมอ ไม่งั้นจะไม่ตรงกับ requestDate ใหม่
+      repaymentDueDate: newRequestDate ? computeRepaymentDueDate(newRequestDate) : undefined,
     },
   });
 

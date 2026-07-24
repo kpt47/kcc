@@ -548,6 +548,13 @@ export const loanRequestSchema = z
     }),
     spouseConsentName: z.string().optional(),
     requestDate: requiredIsoDate,
+    // ตกลงชำระทุกๆวันที่ .... ของเดือน จนครบสัญญา — ใช้คำนวณวันครบกำหนดชำระเงินทั้งหมด/ยอดผ่อนชำระต่อเดือน
+    // (ดู lib/loanSchedule.ts) ไปพร้อมกัน แสดงให้ครัวเรือนเห็นก่อนยื่นคำร้อง และในหน้าหลักหลังยื่นแล้ว
+    paymentDayOfMonth: z
+      .number({ error: "กรุณาระบุวันที่ชำระในแต่ละเดือน" })
+      .int("ระบุวันที่เป็นจำนวนเต็ม")
+      .min(1, "ระบุวันที่ 1-31")
+      .max(31, "ระบุวันที่ 1-31"),
 
     // ขั้นตอนที่ 3: ความเห็นเจ้าหน้าที่ (ไม่บังคับ - กรอกภายหลังได้)
     workerOpinion: z.enum(["agree", "disagree"]).optional(),
@@ -578,6 +585,7 @@ export const loanRequestSelfEditSchema = z.object({
   ),
   spouseConsentName: z.string().optional(),
   requestDate: z.string().optional(),
+  paymentDayOfMonth: z.number().int("ระบุวันที่เป็นจำนวนเต็ม").min(1, "ระบุวันที่ 1-31").max(31, "ระบุวันที่ 1-31").optional(),
 });
 export type LoanRequestSelfEditValues = z.infer<typeof loanRequestSelfEditSchema>;
 
@@ -590,6 +598,7 @@ export interface LoanRequestFormValues {
   agreesToRegulations: boolean;
   spouseConsentName?: string;
   requestDate: string;
+  paymentDayOfMonth: number;
   workerOpinion?: "agree" | "disagree";
   workerReason?: string;
   workerName?: string;
@@ -611,6 +620,7 @@ export interface LoanRequestSubmitValues {
   agreesToRegulations: boolean;
   spouseConsentName?: string;
   requestDate: string;
+  paymentDayOfMonth: number;
   workerOpinion?: "agree" | "disagree";
   workerReason?: string;
   workerName?: string;
@@ -624,7 +634,7 @@ export interface LoanRequestSubmitValues {
 
 export const LOAN_REQUEST_STEP_FIELDS = [
   ["householdId", "applicantAge", "occupation"],
-  ["requestedAmount", "agreesToRegulations", "spouseConsentName", "requestDate"],
+  ["requestedAmount", "agreesToRegulations", "spouseConsentName", "requestDate", "paymentDayOfMonth"],
 ] as const;
 
 // ---------------------------------------------------------------------------

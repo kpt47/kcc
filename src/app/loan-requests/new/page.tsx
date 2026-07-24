@@ -16,6 +16,7 @@ import { thaiBahtText, calculateAge } from "@/lib/thai";
 import { formatThaiDate } from "@/lib/formatDate";
 import { LOAN_CEILING_DEFAULT } from "@/lib/config";
 import { alertDialog, confirmDialog } from "@/lib/confirmDialog";
+import { computeRepaymentDueDate, computeMonthlyInstallment, monthsBetween } from "@/lib/loanSchedule";
 
 const STEPS = [
   { title: "ข้อมูลผู้ขอยืม" },
@@ -74,6 +75,22 @@ function NewLoanRequestForm() {
     linkedProposal?.committeeAmount != null
       ? Math.min(LOAN_CEILING_DEFAULT, linkedProposal.committeeAmount)
       : LOAN_CEILING_DEFAULT;
+
+  // ตัวอย่างวันครบกำหนดชำระเงินทั้งหมด + ยอดผ่อนชำระต่อเดือน — คำนวณสดจากวันที่ยื่นคำขอ/จำนวนเงินที่กรอกไว้
+  // แล้วเก็บค่าจริงตอนบันทึกที่ฝั่ง server (ดู POST /api/loan-requests) ให้ตรงกับที่แสดงไว้ตรงนี้เป๊ะ
+  const requestDateObj = values.requestDate ? new Date(values.requestDate) : null;
+  const repaymentPreview =
+    requestDateObj && values.requestedAmount > 0
+      ? {
+          dueDate: computeRepaymentDueDate(requestDateObj),
+          months: monthsBetween(requestDateObj, computeRepaymentDueDate(requestDateObj)),
+          monthlyInstallment: computeMonthlyInstallment(
+            values.requestedAmount,
+            requestDateObj,
+            computeRepaymentDueDate(requestDateObj)
+          ),
+        }
+      : null;
 
   // ยื่นผ่านลิงก์ในการแจ้งเตือนอนุมัติแบบเสนอโครงการ (?proposalId=...) — ดึงเล่มที่/โครงการที่/วงเงินที่อนุมัติ
   // และผู้ให้ความยินยอมของครัวเรือนนั้นมาเติมให้อัตโนมัติ ไม่ต้องกรอกซ้ำ
@@ -299,6 +316,29 @@ function NewLoanRequestForm() {
                 />
               )}
             />
+
+            <TextField
+              label="1. ตกลงชำระทุกๆวันที่ ..... ของเดือน จนครบสัญญา (ระบุวันที่ 1-31)"
+              required
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={31}
+              error={errors.paymentDayOfMonth?.message}
+              {...register("paymentDayOfMonth", { valueAsNumber: true })}
+            />
+
+            {repaymentPreview && (
+              <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4">
+                <p className="text-sm font-bold text-emerald-800">2. วันครบกำหนดชำระเงินทั้งหมด</p>
+                <p className="text-2xl font-extrabold text-emerald-900">{formatThaiDate(repaymentPreview.dueDate)}</p>
+                <p className="mt-3 text-sm font-bold text-emerald-800">3. ยอดชำระต่อเดือน (โดยประมาณ)</p>
+                <p className="text-2xl font-extrabold text-emerald-900">
+                  {repaymentPreview.monthlyInstallment.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท/เดือน
+                </p>
+                <p className="text-xs text-emerald-700">เป็นเวลา {repaymentPreview.months} เดือน นับจากวันที่ยื่นคำขอ</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -328,6 +368,19 @@ function NewLoanRequestForm() {
                 />
                 <ReviewRow label="ผู้ให้คำยินยอม" value={values.spouseConsentName} />
                 <ReviewRow label="วันที่ยื่นคำขอ" value={formatThaiDate(values.requestDate)} />
+                <ReviewRow
+                  label="ตกลงชำระทุกๆวันที่"
+                  value={values.paymentDayOfMonth ? `วันที่ ${values.paymentDayOfMonth} ของทุกเดือน` : undefined}
+                />
+                {repaymentPreview && (
+                  <>
+                    <ReviewRow label="วันครบกำหนดชำระเงินทั้งหมด" value={formatThaiDate(repaymentPreview.dueDate)} />
+                    <ReviewRow
+                      label="ยอดชำระต่อเดือน (โดยประมาณ)"
+                      value={`${repaymentPreview.monthlyInstallment.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท (${repaymentPreview.months} เดือน)`}
+                    />
+                  </>
+                )}
               </dl>
             </section>
             <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700">

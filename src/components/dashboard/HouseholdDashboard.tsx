@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { User, CheckCircle2, AlertTriangle, XCircle, Users, Banknote, ChevronRight } from "lucide-react";
+import { User, CheckCircle2, AlertTriangle, XCircle, Users, Banknote, ChevronRight, CalendarClock } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { THEMES } from "@/lib/theme";
+import { formatThaiDate } from "@/lib/thai";
+import { computeMonthlyInstallment } from "@/lib/loanSchedule";
 import type { CurrentUser } from "@/lib/auth";
 
 const RISK_RANK: Record<string, number> = { NORMAL: 0, WATCHLIST: 1, HIGH_RISK: 2 };
@@ -47,6 +49,26 @@ export async function HouseholdDashboard({ user }: { user: CurrentUser }) {
     );
   }
 
+  // ข้อตกลงการผ่อนชำระของแบบขอยืมเงินทุนล่าสุด — แสดงให้ครัวเรือนเห็นชัดเจนตั้งแต่หน้าหลัก เพื่อความเข้าใจ
+  // ที่ตรงกันทุกฝ่ายตั้งแต่วันที่ยื่นคำขอ ไม่ต้องรอผลอนุมัติก่อนถึงจะเห็น (เป็นข้อตกลงที่ครัวเรือนกรอกเอง)
+  const latestLoanRequest = await prisma.loanRequest.findFirst({
+    where: { householdId: household.id, paymentDayOfMonth: { not: null }, repaymentDueDate: { not: null } },
+    orderBy: { createdAt: "desc" },
+    select: { requestedAmount: true, requestDate: true, paymentDayOfMonth: true, repaymentDueDate: true },
+  });
+  const repaymentSchedule =
+    latestLoanRequest?.repaymentDueDate
+      ? {
+          paymentDayOfMonth: latestLoanRequest.paymentDayOfMonth!,
+          dueDate: latestLoanRequest.repaymentDueDate,
+          monthlyInstallment: computeMonthlyInstallment(
+            latestLoanRequest.requestedAmount,
+            latestLoanRequest.requestDate,
+            latestLoanRequest.repaymentDueDate
+          ),
+        }
+      : null;
+
   const loans = await prisma.loan.findMany({ where: { householdId: household.id } });
   const outstandingTotal = loans.filter((l) => !l.isClosed).reduce((sum, l) => sum + l.outstandingBalance, 0);
   const activeLoanCount = loans.filter((l) => !l.isClosed).length;
@@ -80,6 +102,38 @@ export async function HouseholdDashboard({ user }: { user: CurrentUser }) {
         <div className={`flex items-start gap-3 rounded-2xl border-2 ${riskBanner.border} ${riskBanner.bg} p-4`}>
           <RiskIcon className="h-8 w-8 shrink-0" aria-hidden />
           <p className="text-base font-semibold leading-snug">{riskBanner.text}</p>
+        </div>
+      )}
+
+      {repaymentSchedule && (
+        <div className="rounded-2xl border-4 border-sky-400 bg-sky-50 p-5 dark:border-sky-700 dark:bg-sky-950/40">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="h-6 w-6 shrink-0 text-sky-700 dark:text-sky-300" aria-hidden />
+            <p className="text-base font-bold text-sky-900 dark:text-sky-200">
+              ข้อตกลงการผ่อนชำระเงินยืม (ตามแบบขอยืมเงินทุนล่าสุด)
+            </p>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">ชำระทุกวันที่</p>
+              <p className="text-4xl font-extrabold leading-tight text-sky-900 dark:text-sky-100">
+                {repaymentSchedule.paymentDayOfMonth}
+              </p>
+              <p className="text-sm text-sky-700 dark:text-sky-300">ของทุกเดือน</p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">ครบกำหนดชำระเงินทั้งหมด</p>
+              <p className="text-2xl font-extrabold leading-tight text-sky-900 dark:text-sky-100 sm:text-3xl">
+                {formatThaiDate(repaymentSchedule.dueDate)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-sky-700 dark:text-sky-300">ยอดชำระต่อเดือน (โดยประมาณ)</p>
+              <p className="text-2xl font-extrabold leading-tight text-sky-900 dark:text-sky-100 sm:text-3xl">
+                {repaymentSchedule.monthlyInstallment.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

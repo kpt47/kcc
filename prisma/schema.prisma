@@ -654,6 +654,10 @@ model LoanRequest {
   agreesToRegulations Boolean @default(false) // ยินยอมปฏิบัติตามระเบียบกระทรวงมหาดไทยฯ
   spouseConsentName String? // ชื่อภรรยา/สามี/ทายาท ผู้ให้คำยินยอม
   requestDate       DateTime // วันที่ลงนามขอยืม
+  paymentDayOfMonth Int? // ตกลงชำระทุกๆวันที่ .... ของเดือน จนครบสัญญา (1-31)
+  repaymentDueDate  DateTime? // วันครบกำหนดชำระเงินทั้งหมด — คำนวณ ณ วันที่ยื่นคำขอ + ระยะเวลาผ่อนชำระสูงสุดตามระเบียบ
+  // (ดู lib/loanSchedule.ts) เก็บค่าไว้ตรงๆ ไม่คำนวณสดทุกครั้ง กันไม่ให้ค่าที่เคยแจ้งครัวเรือนไปแล้วเปลี่ยนไป
+  // หากมีการปรับค่าคงที่ MAX_REPAYMENT_YEARS ในอนาคต
 
   // ความเห็นของพัฒนากรผู้รับผิดชอบประจำตำบล
   workerOpinion String? // "agree" | "disagree"

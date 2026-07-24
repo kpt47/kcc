@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { confirmDialog } from "@/lib/confirmDialog";
+import { alertDialog, confirmDialog } from "@/lib/confirmDialog";
 import { RiskScoreCard } from "./RiskScoreCard";
 
 type Kind = "proposal" | "loan-request";
@@ -17,6 +17,7 @@ export function ApproveAction({
   kind,
   showRiskAssessment,
   defaultChairName,
+  approvalCeiling,
 }: {
   id: number;
   kind: Kind;
@@ -24,6 +25,9 @@ export function ApproveAction({
   /** ชื่อประธานคณะกรรมการ (คำนำหน้า+ชื่อ+เว้น 2 ตัวอักษร+นามสกุล) ของผู้ใช้ที่ล็อกอินอยู่ — เติมอัตโนมัติในช่องนี้
    *  (แก้ไขทับได้ตามปกติ) ให้ประธานไม่ต้องพิมพ์ชื่อตัวเองซ้ำทุกครั้งที่พิจารณาอนุมัติ */
   defaultChairName?: string;
+  /** เฉพาะ kind="loan-request" ที่อ้างอิงแบบเสนอโครงการที่อนุมัติแล้ว — วงเงินที่ประธานกรรมการอนุมัติไว้ในแบบ
+   *  เสนอโครงการนั้น ใช้ตรวจสอบยอดเงินอนุมัติตรงนี้ด้วยกฎเดียวกับตอนครัวเรือนกรอกยอดขอยืม (ดู loan-requests/new) */
+  approvalCeiling?: number;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -36,6 +40,29 @@ export function ApproveAction({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    // ตรวจสอบยอดเงินอนุมัติเทียบกับวงเงินที่อนุมัติไว้ในแบบเสนอโครงการ (กฎเดียวกับตอนครัวเรือนกรอกยอดขอยืม):
+    // เกินวงเงิน บล็อกให้แก้ไขก่อน, น้อยกว่าวงเงิน แค่ถามยืนยันเผื่อพิมพ์ผิด ยังอนุมัติน้อยกว่าที่เสนอไว้ได้ตามจริง
+    if (decision === "approved" && amount && approvalCeiling != null) {
+      const enteredAmount = Number(amount);
+      if (enteredAmount > approvalCeiling) {
+        await alertDialog({
+          title: "วงเงินเกินกว่าที่อนุมัติในแบบเสนอโครงการ",
+          text: `ยอดเงินที่กรอก (${enteredAmount.toLocaleString("th-TH")} บาท) เกินกว่าวงเงินที่อนุมัติไว้ในแบบเสนอโครงการนี้ (${approvalCeiling.toLocaleString("th-TH")} บาท) กรุณาแก้ไขจำนวนเงินก่อนดำเนินการต่อ`,
+          tone: "danger",
+        });
+        return;
+      }
+      if (enteredAmount < approvalCeiling) {
+        const proceed = await confirmDialog({
+          title: "ยอดเงินน้อยกว่าที่อนุมัติในแบบเสนอโครงการ",
+          text: `ยอดเงินที่กรอก (${enteredAmount.toLocaleString("th-TH")} บาท) น้อยกว่าวงเงินที่อนุมัติไว้ในแบบเสนอโครงการนี้ (${approvalCeiling.toLocaleString("th-TH")} บาท) ต้องการดำเนินการต่อด้วยยอดนี้หรือไม่?`,
+          confirmButtonText: "ดำเนินการต่อ",
+        });
+        if (!proceed) return;
+      }
+    }
+
     const confirmed =
       decision === "approved"
         ? await confirmDialog({

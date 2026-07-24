@@ -7,6 +7,7 @@ import { getAllowedVillageIds, canAccessHouseholdRecord } from "@/lib/scope";
 import { ACCESS_DENIED_MESSAGE } from "@/lib/authz";
 import { notifyVillageLeadership } from "@/lib/notifications/notifyUsers";
 import { createLoanRequestWithAutoNumber } from "@/lib/documentNumbering";
+import { computeRepaymentDueDate } from "@/lib/loanSchedule";
 import { Prisma } from "@/generated/prisma/client";
 
 // แบบฟอร์ม 2 (แบบขอยืมเงินทุน): เฉพาะครัวเรือน (HOUSEHOLD) เป็นผู้สร้างของตนเองเท่านั้น — เจ้าหน้าที่/กรรมการ
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
   // หมายเหตุ: ตั้งใจไม่รับ workerOpinion/committeeDecision ฯลฯ จาก payload นี้ — ผู้ยื่นขอยืมเงิน
   // (ครัวเรือน) ต้องไม่สามารถตั้งค่าความเห็นพัฒนากร/ผลอนุมัติของตนเองได้ ต้องผ่าน endpoint
   // /worker-opinion และ /approve ที่ตรวจสิทธิ์แยกต่างหากเท่านั้น
+  const requestDate = new Date(data.requestDate);
   const commonData = {
     householdId: data.householdId,
     applicantAge: data.applicantAge,
@@ -95,7 +97,10 @@ export async function POST(request: Request) {
     requestedAmount: data.requestedAmount,
     agreesToRegulations: data.agreesToRegulations,
     spouseConsentName: data.spouseConsentName,
-    requestDate: new Date(data.requestDate),
+    requestDate,
+    paymentDayOfMonth: data.paymentDayOfMonth,
+    // คำนวณ ณ วันที่ยื่นคำขอ แล้วเก็บค่าไว้ตรงๆ (ดูเหตุผลที่ schema.prisma คอมเมนต์ไว้ที่ฟิลด์นี้)
+    repaymentDueDate: computeRepaymentDueDate(requestDate),
   };
   let loanRequest;
   if (linkedProposal) {
