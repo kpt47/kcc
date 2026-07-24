@@ -3,6 +3,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { FUNDING_RADIUS_KM, fetchNearbyPlaces, findNearbyVillageFunds } from "@/lib/fundingSourcesNearby";
 
+// คิวรีค้นชื่อสถานที่ใน fetchNearbyPlaces อาจใช้เวลาถึง ~26 วินาทีในกรณีเลวร้ายที่สุด (Overpass API สาธารณะ
+// ตอบช้า/ต้องไล่หลาย mirror) — ให้เวลาเกินค่า default ของ Vercel เหมือน route PDF อื่นๆ ในระบบ
+export const maxDuration = 30;
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: { formErrors: ["กรุณาเข้าสู่ระบบ"] } }, { status: 401 });

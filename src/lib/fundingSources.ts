@@ -110,4 +110,12 @@ export const FUNDING_INFO: FundingInfo[] = [
     url: "https://www.gsb.or.th/",
     category: "bank",
   },
+  {
+    key: "ibank",
+    name: "ธนาคารอิสลามแห่งประเทศไทย (ไอแบงก์)",
+    org: "ธนาคารอิสลามแห่งประเทศไทย (ibank)",
+    description: "สินเชื่อและบริการทางการเงินตามหลักศาสนาอิสลาม (ปลอดดอกเบี้ย) สำหรับประชาชนทั่วไปและผู้ประกอบอาชีพอิสระ เหมาะกับครัวเรือนที่ต้องการแหล่งทุนตามหลักศาสนา",
+    url: "https://www.ibank.co.th/",
+    category: "islamic_bank",
+  },
 ];

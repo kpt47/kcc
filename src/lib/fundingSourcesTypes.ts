@@ -5,10 +5,19 @@ export type NearbyVillageFund = { id: number; name: string; distanceKm: number; 
 // หมวดแหล่งทุน/สถาบันการเงินที่ดึงพิกัดจริงจากแผนที่ออนไลน์ (Overpass API/OpenStreetMap) — ครอบคลุมมากกว่าแค่
 // "ธนาคาร" เดิม โดยจับคู่ทั้ง tag มาตรฐาน (amenity=bank/marketplace, office=cooperative) และค้นชื่อสถานที่
 // ที่มีคำเฉพาะของไทย (กองทุน/สหกรณ์/วิสาหกิจชุมชน/โอทอป ฯลฯ) เพราะ OSM ไม่มี tag แยกสำหรับหมวดเหล่านี้โดยตรง
-export type FundingSourceCategory = "bank" | "cooperative" | "market" | "community_fund" | "otop" | "enterprise" | "other";
+export type FundingSourceCategory =
+  | "bank"
+  | "islamic_bank"
+  | "cooperative"
+  | "market"
+  | "community_fund"
+  | "otop"
+  | "enterprise"
+  | "other";
 
 export const FUNDING_CATEGORY_LABEL: Record<FundingSourceCategory, string> = {
   bank: "ธนาคาร",
+  islamic_bank: "ธนาคารอิสลาม",
   cooperative: "สหกรณ์",
   market: "ตลาดนัด",
   community_fund: "กองทุนชุมชน",
@@ -19,6 +28,7 @@ export const FUNDING_CATEGORY_LABEL: Record<FundingSourceCategory, string> = {
 
 export const FUNDING_CATEGORY_COLOR: Record<FundingSourceCategory, string> = {
   bank: "#2563eb",
+  islamic_bank: "#059669",
   cooperative: "#0d9488",
   market: "#f97316",
   community_fund: "#c026d3",

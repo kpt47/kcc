@@ -17,6 +17,9 @@ import { googleMapsSearchUrl, googleMapsDirectionsUrl } from "@/lib/googleMaps";
 // พิกัดจริงใกล้เคียงจะแสดงรายชื่อ+ระยะทาง+ปุ่มนำทางตรง ถ้าไม่พบ (หมวดที่ไม่มีข้อมูลใน OSM ในพื้นที่นั้น) จะ
 // fallback ไปปุ่ม "ค้นหาใกล้ฉันใน Google Maps" แทน (เปิดผลค้นหาจริงจากฐานข้อมูลของ Google เอง ไม่ต้องใช้ API key)
 export const dynamic = "force-dynamic";
+// fetchNearbyPlaces เรียก Overpass API สาธารณะซึ่งอาจช้า (ดูคอมเมนต์ใน lib/fundingSourcesNearby.ts) —
+// ให้เวลาเกินค่า default ของ Vercel เหมือน route PDF อื่นๆ ในระบบ
+export const maxDuration = 30;
 
 function NearbyPlaceRow({ place }: { place: NearbyPlace }) {
   return (
