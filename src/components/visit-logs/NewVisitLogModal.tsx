@@ -105,7 +105,7 @@ export function NewVisitLogModal({ villages }: { villages: { id: number; village
             <label className="mb-1 block text-xs font-semibold text-slate-500">หมู่บ้าน</label>
             <select
               value={villageId}
-              onChange={(e) => setVillageId(e.target.value)}
+              onChange={(e) => setVillageId(Number(e.target.value))}
               required
               className="min-h-11 w-full rounded-lg border border-slate-300 px-3 text-sm"
             >
