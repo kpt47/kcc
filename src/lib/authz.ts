@@ -365,6 +365,20 @@ export function canViewAuditLog(user: Pick<CurrentUser, "role">): boolean {
   );
 }
 
+/** เมนู "ข้อมูลสถิติ": ส่วนกลาง/พัฒนาการจังหวัด/พัฒนาการอำเภอ/พัฒนากรตำบล เท่านั้น (ไม่รวม IT_SUPPORT
+ *  เพราะไม่ใช่ผู้เกี่ยวข้องกับข้อมูลโครงการ กข.คจ. — ดู isItSupportBlockedFromProgramData) */
+export function canViewStatisticsDashboard(user: Pick<CurrentUser, "role">): boolean {
+  return (
+    user.role === "GLOBAL_ADMIN" ||
+    user.role === "PROVINCIAL_ADMIN" ||
+    user.role === "DISTRICT_ADMIN" ||
+    user.role === "SUB_DISTRICT_ADMIN"
+  );
+}
+
+export const STATISTICS_DENIED_MESSAGE =
+  "Access Denied: เมนูข้อมูลสถิติ จำกัดสิทธิ์เฉพาะส่วนกลาง พัฒนาการจังหวัด พัฒนาการอำเภอ และพัฒนากรตำบลเท่านั้น";
+
 /** ส่วนกลาง/IT_SUPPORT เห็นได้ทั้งระบบไม่จำกัดพื้นที่ (villageId ไม่ถูกกรอง) — role อื่นเห็นเฉพาะพื้นที่ตนเอง */
 export function auditLogSeesAllAreas(user: Pick<CurrentUser, "role">): boolean {
   return user.role === "GLOBAL_ADMIN" || user.role === "IT_SUPPORT";

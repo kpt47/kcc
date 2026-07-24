@@ -13,6 +13,7 @@ import {
   MapPin,
   Briefcase,
   MessageCircle,
+  PieChart,
   BarChart3,
   UserCog,
   Settings,
@@ -27,7 +28,7 @@ import {
   Shield,
 } from "lucide-react";
 import { menusForRole } from "./dashboard";
-import { hasMinRole, canViewAuditLog } from "./authz";
+import { hasMinRole, canViewAuditLog, canViewStatisticsDashboard } from "./authz";
 import type { CurrentUser } from "./auth";
 
 export type NavLink = { href: string; label: string; icon: LucideIcon; iconColor?: string; group?: string };
@@ -161,6 +162,8 @@ export function getNavLinks(user: CurrentUser): NavLink[] {
     { href: "/", label: "หน้าหลัก", icon: Home },
     { href: "/overview-report", label: "Dashboard", icon: Map },
     { href: "/dashboard", label: "รายงานการเงิน", icon: LayoutDashboard },
+    // เฉพาะส่วนกลาง/พัฒนาการจังหวัด/พัฒนาการอำเภอ/พัฒนากรตำบล — ต้องตรงกับ lib/authz.ts: canViewStatisticsDashboard เป๊ะ
+    ...(canViewStatisticsDashboard(user) ? [{ href: "/statistics", label: "ข้อมูลสถิติ", icon: PieChart }] : []),
     ...menusForRole(user).map((m) => ({
       href: m.href,
       label: m.title,

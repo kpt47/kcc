@@ -11,11 +11,18 @@ export function PieChartCard({
   subtitle,
   filename,
   data,
+  unit = "บาท",
+  excelValueLabel = "จำนวนเงิน",
 }: {
   title: string;
   subtitle?: string;
   filename: string;
   data: { name: string; value: number }[];
+  /** หน่วยของค่าที่แสดงใน tooltip — ค่าเริ่มต้น "บาท" (ของเดิม) ใส่ "คน"/"ครัวเรือน"/"ราย"/"ครั้ง" ฯลฯ
+   *  สำหรับกราฟที่นับจำนวน ไม่ใช่จำนวนเงิน (เช่นหน้าข้อมูลสถิติ) */
+  unit?: string;
+  /** ชื่อคอลัมน์ที่ 2 ตอน export Excel — ค่าเริ่มต้น "จำนวนเงิน" (ของเดิม) */
+  excelValueLabel?: string;
 }) {
   const total = data.reduce((s, d) => s + d.value, 0);
   const chartTheme = useChartTheme();
@@ -25,7 +32,7 @@ export function PieChartCard({
       title={title}
       subtitle={subtitle}
       filename={filename}
-      excelRows={() => data.map((d) => ({ รายการ: d.name, จำนวนเงิน: d.value }))}
+      excelRows={() => data.map((d) => ({ รายการ: d.name, [excelValueLabel]: d.value }))}
     >
       {total <= 0 ? (
         <p className="py-10 text-center text-sm text-slate-400 dark:text-slate-500">ยังไม่มีข้อมูลสำหรับแสดงกราฟ</p>
@@ -39,7 +46,7 @@ export function PieChartCard({
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value) => `${Number(value).toLocaleString("th-TH")} บาท`}
+                formatter={(value) => `${Number(value).toLocaleString("th-TH")} ${unit}`}
                 contentStyle={{ background: chartTheme.tooltipBg, border: `1px solid ${chartTheme.tooltipBorder}`, borderRadius: 8 }}
                 itemStyle={{ color: chartTheme.tooltipText }}
                 labelStyle={{ color: chartTheme.tooltipText }}
