@@ -23,7 +23,8 @@ export function Sidebar({ user }: { user: CurrentUser }) {
   const pathname = usePathname();
   const links = getNavLinks(user);
   const { ungrouped, groups } = groupNavLinks(links);
-  const { collapsed, toggle } = useNavAccordion();
+  const activeGroup = groups.find((g) => g.links.some((l) => l.href === pathname))?.group ?? null;
+  const { openGroup, toggle } = useNavAccordion(activeGroup);
 
   function renderLink(l: NavLink) {
     const active = pathname === l.href;
@@ -65,13 +66,13 @@ export function Sidebar({ user }: { user: CurrentUser }) {
           {groups.map((g) => {
             const style = NAV_GROUP_STYLE[g.group];
             const HeaderIcon = style?.icon;
-            const isCollapsed = !!collapsed[g.group];
+            const isOpen = openGroup === g.group;
             return (
               <li key={g.group} className="mt-4 first:mt-0">
                 <button
                   type="button"
                   onClick={() => toggle(g.group)}
-                  aria-expanded={!isCollapsed}
+                  aria-expanded={isOpen}
                   className={`mb-1.5 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wide transition ${
                     style ? `${style.bg} ${style.text}` : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                   }`}
@@ -80,9 +81,20 @@ export function Sidebar({ user }: { user: CurrentUser }) {
                     {HeaderIcon && <HeaderIcon className="h-4 w-4 shrink-0" />}
                     <span>{g.label}</span>
                   </span>
-                  <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 transition-transform duration-200 ${isOpen ? "" : "-rotate-90"}`}
+                  />
                 </button>
-                {!isCollapsed && <ul className="flex flex-col gap-1">{g.links.map(renderLink)}</ul>}
+                {/* เทคนิค grid-template-rows: 0fr -> 1fr ให้ความสูงเลื่อนลื่นโดยไม่ต้องคำนวณความสูงจริงด้วย JS —
+                    ลิงก์ยังอยู่ใน DOM ตลอดเวลา (ต่างจากเดิมที่ conditional render) จึงต้องซ่อนด้วย visibility
+                    เพิ่มด้วย ไม่ใช่แค่ height:0 เฉยๆ ไม่งั้นยังกด Tab ไปโฟกัสลิงก์ที่พับอยู่ได้ */}
+                <div
+                  className={`grid transition-[grid-template-rows] duration-200 ease-out ${isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+                >
+                  <div className={`overflow-hidden ${isOpen ? "visible" : "invisible"}`}>
+                    <ul className="flex flex-col gap-1 pt-0.5">{g.links.map(renderLink)}</ul>
+                  </div>
+                </div>
               </li>
             );
           })}
