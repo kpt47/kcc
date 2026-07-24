@@ -131,6 +131,20 @@ export const debtConfirmationSchema = z.object({
 });
 export type DebtConfirmationFormValues = z.infer<typeof debtConfirmationSchema>;
 
+// ครัวเรือนส่งคำร้อง "ปรึกษา/ร้องทุกข์" ถึงพัฒนาการอำเภอ/พัฒนาการจังหวัด — /api/household-inquiries
+export const householdInquirySchema = z
+  .object({
+    topic: z.enum(["CONSULT", "COMPLAINT", "OTHER"], { error: "กรุณาเลือกหัวข้อ" }),
+    topicOther: z.string().trim().optional(),
+    details: z.string().trim().min(1, "กรุณากรอกรายละเอียด").max(2000, "รายละเอียดยาวเกินไป"),
+    attachmentUrl: z.string().trim().optional(),
+  })
+  .refine((data) => data.topic !== "OTHER" || !!data.topicOther, {
+    message: "กรุณากรอกหัวข้อ",
+    path: ["topicOther"],
+  });
+export type HouseholdInquiryFormValues = z.infer<typeof householdInquirySchema>;
+
 // ค้นหา/กรองครัวเรือนเป้าหมาย — /api/households/search
 export const householdSearchSchema = z.object({
   q: z.string().trim().optional(),

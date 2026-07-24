@@ -314,6 +314,19 @@ export function canViewVillageStatusBook(user: Pick<CurrentUser, "role">): boole
 export const VILLAGE_STATUS_BOOK_DENIED_MESSAGE =
   "Access Denied: สมุดบันทึกสถานะหมู่บ้าน (เล่มน้ำตาล) จำกัดสิทธิ์เฉพาะพัฒนากรตำบล ผู้บริหารอำเภอ และผู้บริหารจังหวัดเท่านั้น";
 
+/** เมนู "ปรึกษา/ร้องทุกข์": เฉพาะครัวเรือนเป้าหมาย (HOUSEHOLD) เท่านั้นที่ส่งคำร้องได้ */
+export function canSubmitHouseholdInquiry(user: Pick<CurrentUser, "role">): boolean {
+  return user.role === "HOUSEHOLD";
+}
+
+/** เมนู "ปรึกษา/ร้องทุกข์": ผู้บริหารอำเภอและผู้บริหารจังหวัดดูได้เฉพาะเขตพื้นที่ของตนเอง (ดู scope.ts) */
+export function canViewHouseholdInquiries(user: Pick<CurrentUser, "role">): boolean {
+  return user.role === "DISTRICT_ADMIN" || user.role === "PROVINCIAL_ADMIN";
+}
+
+export const HOUSEHOLD_INQUIRY_DENIED_MESSAGE =
+  "Access Denied: หัวข้อปรึกษา/ร้องทุกข์ของครัวเรือน จำกัดสิทธิ์เฉพาะผู้บริหารอำเภอและผู้บริหารจังหวัดเท่านั้น";
+
 /**
  * เล่มเขียว (บัญชีคุมเงินฝากธนาคาร): ครัวเรือน (HOUSEHOLD) ไม่มีสิทธิ์ดู GET เด็ดขาด (ชาวบ้านไม่มีสิทธิ์ดู
  * สมุดบัญชีธนาคารหมู่บ้าน) — IT_SUPPORT ก็ไม่มีสิทธิ์เช่นกัน เพราะไม่ใช่ข้อมูลที่เกี่ยวข้องกับหน้าที่ดูแลระบบ

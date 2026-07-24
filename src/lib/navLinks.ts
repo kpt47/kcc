@@ -12,6 +12,7 @@ import {
   CalendarCheck,
   MapPin,
   Briefcase,
+  MessageCircle,
   BarChart3,
   UserCog,
   Settings,
@@ -37,6 +38,7 @@ export const NAV_GROUP_LABELS: Record<string, string> = {
   forms: "แบบฟอร์มและเอกสาร",
   reports: "รายงานและค้นหา",
   admin: "ผู้ดูแลระบบ",
+  settings: "ตั้งค่า",
 };
 
 export type NavListItem = { type: "link"; link: NavLink } | { type: "header"; label: string; group: string };
@@ -49,6 +51,7 @@ export const NAV_GROUP_STYLE: Record<string, { icon: LucideIcon; text: string; b
   forms: { icon: FolderOpen, text: "text-cyan-700 dark:text-cyan-300", bg: "bg-cyan-50 dark:bg-cyan-950/40" },
   reports: { icon: Search, text: "text-rose-700 dark:text-rose-300", bg: "bg-rose-50 dark:bg-rose-950/40" },
   admin: { icon: Shield, text: "text-indigo-700 dark:text-indigo-300", bg: "bg-indigo-50 dark:bg-indigo-950/40" },
+  settings: { icon: Settings, text: "text-teal-700 dark:text-teal-300", bg: "bg-teal-50 dark:bg-teal-950/40" },
 };
 
 /**
@@ -147,6 +150,12 @@ export function getNavLinks(user: CurrentUser): NavLink[] {
         icon: Briefcase,
         iconColor: "text-emerald-600 dark:text-emerald-300",
       },
+      {
+        href: "/household-inquiries",
+        label: "ปรึกษา/ร้องทุกข์",
+        icon: MessageCircle,
+        iconColor: "text-rose-600 dark:text-rose-300",
+      },
     ];
   }
 
@@ -182,6 +191,18 @@ export function getNavLinks(user: CurrentUser): NavLink[] {
       : []),
     ...(canViewAuditLog(user)
       ? [{ href: "/admin/audit-logs", label: "Audit Logs", icon: ShieldCheck, group: "admin" }]
+      : []),
+    // เฉพาะผู้บริหารอำเภอ/ผู้บริหารจังหวัด — ต้องตรงกับ lib/authz.ts: canViewHouseholdInquiries เป๊ะ
+    ...(role === "DISTRICT_ADMIN" || role === "PROVINCIAL_ADMIN"
+      ? [
+          {
+            href: "/settings/household-inquiries",
+            label: "ปรึกษา/ร้องทุกข์",
+            icon: MessageCircle,
+            iconColor: "text-rose-600 dark:text-rose-300",
+            group: "settings",
+          },
+        ]
       : []),
     { href: "/about-program", label: "เกี่ยวกับโปรแกรม", icon: Info, group: "admin" },
   ];

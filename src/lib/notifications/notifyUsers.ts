@@ -55,3 +55,34 @@ export async function notifyVillageLeadership(villageId: number, message: string
     link
   );
 }
+
+/**
+ * แจ้งเตือนผู้บริหารอำเภอ (DISTRICT_ADMIN) และผู้บริหารจังหวัด (PROVINCIAL_ADMIN) ที่ดูแลเขตพื้นที่ของหมู่บ้าน
+ * ที่ระบุ — ใช้เมื่อครัวเรือนส่งคำร้อง "ปรึกษา/ร้องทุกข์" ใหม่ (ไม่ใช้ scope.ts เพราะฟังก์ชันนั้นคืนรายชื่อ
+ * villageId ทั้งหมดที่ผู้ใช้คนหนึ่งมองเห็น — ที่นี่ต้องการทิศทางตรงข้าม คือหาผู้ใช้ทั้งหมดที่มองเห็นหมู่บ้านหนึ่งๆ)
+ */
+export async function notifyDistrictAndProvinceAdmins(villageId: number, message: string, link?: string): Promise<void> {
+  const village = await prisma.village.findUnique({
+    where: { id: villageId },
+    select: { subDistrict: { select: { districtId: true, district: { select: { provinceId: true } } } } },
+  });
+  if (!village) return;
+  const { districtId, district } = village.subDistrict;
+
+  const recipients = await prisma.user.findMany({
+    where: {
+      OR: [
+        { role: "DISTRICT_ADMIN", scopeDistrictId: districtId },
+        { role: "PROVINCIAL_ADMIN", scopeProvinceId: district.provinceId },
+      ],
+    },
+    select: { id: true },
+  });
+
+  await notifyUsers(
+    recipients.map((r) => r.id),
+    message,
+    "ALERT",
+    link
+  );
+}

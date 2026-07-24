@@ -149,6 +149,7 @@ model User {
   createdDebtConfirmationRounds DebtConfirmationRound[]
   debtConfirmationsMade         DebtConfirmation[]
   recordedVisitLogs             VisitLog[]
+  submittedInquiries            HouseholdInquiry[]
 }
 
 /// ข้อมูลส่วนบุคคลของผู้ใช้ role HOUSEHOLD (1-to-1 กับ User, สร้างเมื่อมีการเปิดบัญชีให้ครัวเรือน)
@@ -254,6 +255,7 @@ model Village {
   meetingRecords    VillageMeetingRecord[]
   debtConfirmationRounds DebtConfirmationRound[]
   auditLogs         SystemAuditLog[]
+  inquiries         HouseholdInquiry[]
 
   @@unique([villageNo, subDistrictId])
 }
@@ -300,6 +302,7 @@ model TargetHousehold {
   loanRequests  LoanRequest[]
   users         User[] // บัญชีผู้ใช้ role HOUSEHOLD ที่ผูกกับครัวเรือนนี้ (สำหรับ data isolation)
   debtConfirmations DebtConfirmation[]
+  inquiries     HouseholdInquiry[]
 
   @@unique([villageId, sequenceNo])
 }
@@ -751,4 +754,31 @@ model PdpaConsent {
   ipAddress     String?
 
   @@index([userId, policyVersion])
+}
+
+/// หัวข้อคำร้อง "ปรึกษา/ร้องทุกข์" ที่ครัวเรือนเป้าหมายส่งถึงผู้บริหารอำเภอ/จังหวัด
+enum InquiryTopic {
+  CONSULT // ปรึกษา
+  COMPLAINT // ร้องทุกข์
+  OTHER // อื่นๆ (ดูข้อความจริงที่ topicOther)
+}
+
+/// เมนู "ปรึกษา/ร้องทุกข์" — ครัวเรือนเป้าหมายส่งข้อความถึงพัฒนาการอำเภอ/พัฒนาการจังหวัดในเขตพื้นที่ของตนเอง
+/// เพื่อการพัฒนาบริการต่างๆ ให้ดีขึ้น villageId เก็บซ้ำจาก household.villageId (denormalized) เพื่อกรองตามเขต
+/// พื้นที่ (scopeWhereDirect ใน lib/scope.ts) ได้โดยตรงโดยไม่ต้อง join ผ่าน household ทุกครั้ง
+model HouseholdInquiry {
+  id            Int             @id @default(autoincrement())
+  householdId   Int
+  household     TargetHousehold @relation(fields: [householdId], references: [id])
+  villageId     Int
+  village       Village         @relation(fields: [villageId], references: [id])
+  topic         InquiryTopic
+  topicOther    String? // ข้อความหัวข้อที่กรอกเอง — ใช้เมื่อ topic = OTHER เท่านั้น
+  details       String
+  attachmentUrl String? // ไฟล์/รูปภาพประกอบ (ถ้ามี) — ดู src/app/api/uploads/route.ts
+  submittedById Int
+  submittedBy   User            @relation(fields: [submittedById], references: [id])
+  createdAt     DateTime        @default(now())
+
+  @@index([villageId])
 }
