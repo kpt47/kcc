@@ -56,6 +56,9 @@ function NewLoanRequestForm() {
   );
   const [linkedProposal, setLinkedProposal] = useState<LinkedProposal | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
+  // true จนกว่าจะรู้แน่ชัดว่ามีแบบเสนอโครงการที่อนุมัติแล้วมาอ้างอิงหรือไม่ — กันไม่ให้กรอกยอดขอยืมได้ก่อนรู้ผล
+  // (ไม่งั้นจะมีช่วงเวลาสั้นๆ ที่พิมพ์ยอดเกินวงเงินจริงได้ก่อนที่ระบบจะโหลดข้อมูลวงเงินที่อนุมัติมาจำกัดทัน)
+  const [checkingProposalLink, setCheckingProposalLink] = useState(true);
   // วันครบกำหนดชำระเงินทั้งหมด: ค่าเริ่มต้นตามวันที่ยื่นคำขอ (+MAX_REPAYMENT_YEARS) แต่ครัวเรือนแก้ไขเองได้ —
   // เมื่อแก้เองแล้วครั้งหนึ่ง จะไม่ auto-update ตามวันที่ยื่นคำขอที่เปลี่ยนภายหลังอีก (เคารพค่าที่เลือกเอง)
   const [dueDateTouched, setDueDateTouched] = useState(false);
@@ -137,15 +140,20 @@ function NewLoanRequestForm() {
         return res.json();
       })
       .then((data: LinkedProposal | null) => {
-        if (cancelled || !data) return;
-        setLinkedProposal(data);
-        setValue("householdId", data.householdId);
-        setValue("applicantAge", data.applicantAge);
-        setValue("occupation", data.occupation);
-        if (data.consentPersonName) setValue("spouseConsentName", data.consentPersonName);
+        if (cancelled) return;
+        if (data) {
+          setLinkedProposal(data);
+          setValue("householdId", data.householdId);
+          setValue("applicantAge", data.applicantAge);
+          setValue("occupation", data.occupation);
+          if (data.consentPersonName) setValue("spouseConsentName", data.consentPersonName);
+        }
       })
       .catch((err: Error) => {
         if (!cancelled && proposalIdParam) setLinkError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setCheckingProposalLink(false);
       });
     return () => {
       cancelled = true;
@@ -275,15 +283,22 @@ function NewLoanRequestForm() {
 
         {step === 1 && (
           <div className="flex flex-col gap-4">
-            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-              เพดานวงเงินขอยืมต่อครั้ง: {amountCeiling.toLocaleString("th-TH")} บาท
-              {linkedProposal?.committeeAmount != null
-                ? " — จำกัดตามวงเงินที่ประธานกรรมการอนุมัติในแบบเสนอโครงการ"
-                : " (ค่าเริ่มต้น) — ปรับได้ตามมติคณะกรรมการ กข.คจ. หมู่บ้านและงบประมาณคงเหลือจริง"}
-            </p>
+            {checkingProposalLink ? (
+              <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+                กำลังตรวจสอบวงเงินที่อนุมัติจากแบบเสนอโครงการ...
+              </p>
+            ) : (
+              <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                เพดานวงเงินขอยืมต่อครั้ง: {amountCeiling.toLocaleString("th-TH")} บาท
+                {linkedProposal?.committeeAmount != null
+                  ? " — จำกัดตามวงเงินที่ประธานกรรมการอนุมัติในแบบเสนอโครงการ"
+                  : " (ค่าเริ่มต้น) — ปรับได้ตามมติคณะกรรมการ กข.คจ. หมู่บ้านและงบประมาณคงเหลือจริง"}
+              </p>
+            )}
             <MoneyField
               label="2. มีความประสงค์จะขอยืมเงินทุน เป็นเงินทั้งสิ้น (บาท)"
               required
+              disabled={checkingProposalLink}
               max={amountCeiling}
               error={errors.requestedAmount?.message}
               amountValue={values.requestedAmount}
