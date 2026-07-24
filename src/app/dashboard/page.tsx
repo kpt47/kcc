@@ -43,7 +43,7 @@ export default async function DashboardPage() {
   const user = await requireUser();
 
   return (
-    <PageContainer title="สรุปรายงาน" subtitle="ภาพรวมข้อมูลตามสิทธิ์การเข้าถึงของคุณ (RBAC)">
+    <PageContainer title="รายงานการเงิน" subtitle="ภาพรวมข้อมูลตามสิทธิ์การเข้าถึงของคุณ (RBAC)">
       <Suspense>
         <AccessDeniedToast />
       </Suspense>

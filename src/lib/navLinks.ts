@@ -146,7 +146,7 @@ export function getNavLinks(user: CurrentUser): NavLink[] {
   return [
     { href: "/", label: "หน้าหลัก", icon: Home },
     { href: "/overview-report", label: "Dashboard", icon: Map },
-    { href: "/dashboard", label: "สรุปรายงาน", icon: LayoutDashboard },
+    { href: "/dashboard", label: "รายงานการเงิน", icon: LayoutDashboard },
     ...menusForRole(user).map((m) => ({
       href: m.href,
       label: m.title,
