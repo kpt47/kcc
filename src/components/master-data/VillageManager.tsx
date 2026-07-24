@@ -15,7 +15,7 @@ export type VillageRow = {
   budgetAmount: number | null;
   latitude: number | null;
   longitude: number | null;
-  subDistrict: { id: number; name: string; district: { name: string; province: { name: string } } };
+  subDistrict: { id: number; name: string; district: { name: string; province: { id: number; name: string } } };
 };
 
 /**
@@ -33,6 +33,7 @@ export function VillageManager({
   villages,
   subDistricts,
   canManage,
+  manageableProvinceId,
   canManageVillage,
   scopeLock,
   currentUser,
@@ -40,6 +41,8 @@ export function VillageManager({
   villages: VillageRow[];
   subDistricts: { id: number; name: string }[];
   canManage: boolean;
+  /** null = ไม่จำกัดจังหวัด (เช่น GLOBAL_ADMIN); มีค่า = แก้ไข/ลบได้เฉพาะหมู่บ้านในจังหวัดนี้เท่านั้น (PROVINCIAL_ADMIN) */
+  manageableProvinceId: number | null;
   canManageVillage: boolean;
   scopeLock: VillageScopeLock;
   currentUser: Pick<{ role: GlobalRole }, "role">;
@@ -331,7 +334,9 @@ export function VillageManager({
       )}
 
       <div className="flex flex-col gap-1.5">
-        {villages.map((v) => (
+        {villages.map((v) => {
+        const rowManageable = canManage && (manageableProvinceId == null || v.subDistrict.district.province.id === manageableProvinceId);
+        return (
           <div key={v.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
             {editingId === v.id ? (
               <div className="flex flex-1 flex-col gap-1.5">
@@ -379,7 +384,7 @@ export function VillageManager({
                 </span>
               </span>
             )}
-            {canManage && (
+            {rowManageable && (
               <div className="flex shrink-0 gap-1.5">
                 {editingId === v.id ? (
                   <>
@@ -412,7 +417,8 @@ export function VillageManager({
               </div>
             )}
           </div>
-        ))}
+        );
+        })}
       </div>
     </div>
   );

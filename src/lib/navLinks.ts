@@ -27,9 +27,10 @@ import {
   Search,
   Shield,
   HandCoins,
+  UserPlus,
 } from "lucide-react";
 import { menusForRole } from "./dashboard";
-import { hasMinRole, canViewAuditLog, canViewStatisticsDashboard } from "./authz";
+import { hasMinRole, canViewAuditLog, canViewStatisticsDashboard, canViewUserAssignments } from "./authz";
 import type { CurrentUser } from "./auth";
 
 export type NavLink = { href: string; label: string; icon: LucideIcon; iconColor?: string; group?: string };
@@ -200,11 +201,17 @@ export function getNavLinks(user: CurrentUser): NavLink[] {
     { href: "/reports/smart", label: "วิเคราะห์ข้อมูล", icon: MapPin, group: "reports" },
     { href: "/official-reports", label: "แบบรายงานภาวะหนี้สินฯ", icon: BarChart3, group: "reports" },
     ...(isUserManager ? [{ href: "/users", label: "จัดการผู้ใช้งาน", icon: UserCog, group: "admin" }] : []),
-    ...(hasMinRole(user, "GLOBAL_ADMIN")
+    // GLOBAL_ADMIN จัดการได้ทั่วประเทศ, PROVINCIAL_ADMIN จัดการได้เฉพาะหมู่บ้านในจังหวัดของตนเอง (ดู
+    // lib/authz.ts: canManageVillageInProvince) — ต้องตรงกับเงื่อนไขที่ใช้จริงในหน้า /master-data เป๊ะ
+    ...(hasMinRole(user, "PROVINCIAL_ADMIN")
       ? [{ href: "/master-data", label: "จัดการพื้นที่ (หมู่บ้าน)", icon: Settings, group: "admin" }]
       : []),
     ...(canViewAuditLog(user)
       ? [{ href: "/admin/audit-logs", label: "Audit Logs", icon: ShieldCheck, group: "admin" }]
+      : []),
+    // เฉพาะกรมและพัฒนาการจังหวัด — ต้องตรงกับ lib/authz.ts: canViewUserAssignments เป๊ะ
+    ...(canViewUserAssignments(user)
+      ? [{ href: "/admin/user-assignments", label: "การมอบหมายงาน", icon: UserPlus, group: "admin" }]
       : []),
     // เฉพาะผู้บริหารอำเภอ/ผู้บริหารจังหวัด — ต้องตรงกับ lib/authz.ts: canViewHouseholdInquiries เป๊ะ
     ...(role === "DISTRICT_ADMIN" || role === "PROVINCIAL_ADMIN"

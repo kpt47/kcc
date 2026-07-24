@@ -67,12 +67,17 @@ export default async function MasterDataPage() {
     prisma.village.findMany({
       orderBy: [{ subDistrict: { name: "asc" } }, { villageNo: "asc" }],
       include: {
-        subDistrict: { select: { id: true, name: true, district: { select: { name: true, province: { select: { name: true } } } } } },
+        subDistrict: {
+          select: { id: true, name: true, district: { select: { name: true, province: { select: { id: true, name: true } } } } },
+        },
       },
     }),
   ]);
 
   const scopeLock = resolveScopeLock(user, provinces, districts, subDistricts);
+  // GLOBAL_ADMIN แก้ไข/ลบได้ทุกหมู่บ้าน (ไม่จำกัดจังหวัด) — PROVINCIAL_ADMIN แก้ไข/ลบได้เฉพาะหมู่บ้านในจังหวัด
+  // ของตนเอง (ดู canManageVillageInProvince) ระดับอื่นเห็นรายชื่อทั้งหมดได้อย่างเดียว ไม่มีปุ่มแก้ไข/ลบเลย
+  const manageableProvinceId = user.role === "PROVINCIAL_ADMIN" ? user.scopeProvinceId : null;
 
   return (
     <PageContainer
@@ -89,7 +94,8 @@ export default async function MasterDataPage() {
         <VillageManager
           villages={villages}
           subDistricts={subDistricts.map((s) => ({ id: s.id, name: s.name }))}
-          canManage={canManage}
+          canManage={canManage || user.role === "PROVINCIAL_ADMIN"}
+          manageableProvinceId={manageableProvinceId}
           canManageVillage={canManageVillage}
           scopeLock={scopeLock}
           currentUser={user}

@@ -58,6 +58,28 @@ export function canCreateVillage(user: Pick<CurrentUser, "role">): boolean {
 }
 
 /**
+ * แก้ไข/ลบข้อมูลหมู่บ้านที่มีอยู่แล้ว (คนละสิทธิ์กับ canCreateVillage ซึ่งคุมเฉพาะการ "เพิ่ม" ใหม่) —
+ * GLOBAL_ADMIN แก้ไข/ลบได้ทุกหมู่บ้านทั่วประเทศ, PROVINCIAL_ADMIN แก้ไข/ลบได้เฉพาะหมู่บ้านที่อยู่ในจังหวัด
+ * ของตนเองเท่านั้น (ตรวจจาก scopeProvinceId เทียบกับจังหวัดจริงของหมู่บ้านนั้น ไม่ใช่จาก villageId ที่ frontend
+ * ส่งมาตรงๆ) ระดับอื่นดูข้อมูลได้อย่างเดียว
+ */
+/**
+ * ดูหน้า "การมอบหมายงาน" — ตารางวันที่เพิ่มบัญชี User ระดับพัฒนาการจังหวัด/พัฒนาการอำเภอ/พัฒนากรตำบล
+ * เฉพาะกรม (GLOBAL_ADMIN เห็นทั่วประเทศ) และพัฒนาการจังหวัด (เห็นเฉพาะบัญชีในจังหวัดของตนเอง) เท่านั้น
+ */
+export function canViewUserAssignments(user: Pick<CurrentUser, "role">): boolean {
+  return user.role === "GLOBAL_ADMIN" || user.role === "PROVINCIAL_ADMIN";
+}
+
+export function canManageVillageInProvince(
+  user: Pick<CurrentUser, "role" | "scopeProvinceId">,
+  provinceId: number
+): boolean {
+  if (user.role === "GLOBAL_ADMIN") return true;
+  return user.role === "PROVINCIAL_ADMIN" && user.scopeProvinceId === provinceId;
+}
+
+/**
  * ข้อความปฏิเสธสิทธิ์เฉพาะการเพิ่ม/แก้ไข/ลบรายชื่อหมู่บ้าน (Master Data) — ใช้แทน ACCESS_DENIED_MESSAGE
  * ที่ /api/villages โดยเฉพาะ ตามที่ผู้ใช้กำหนดไว้ชัดเจน (เดิม endpoint นี้ไม่มีการตรวจสอบสิทธิ์เลย เป็นช่องโหว่
  * ให้ผู้ใช้ทุกระดับรวมถึงประธานคณะกรรมการหมู่บ้านสร้างหมู่บ้าน/ตำบล/อำเภอ/จังหวัดปลอมลงระบบได้)

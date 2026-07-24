@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import { ACCESS_DENIED_MESSAGE, canManageMasterData } from "@/lib/authz";
+import { ACCESS_DENIED_MESSAGE, canManageVillageInProvince } from "@/lib/authz";
 
 const updateVillageSchema = z.object({
   villageNo: z.string().trim().min(1, "กรุณากรอกหมู่ที่").optional(),
@@ -16,14 +16,20 @@ const updateVillageSchema = z.object({
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: { formErrors: ["กรุณาเข้าสู่ระบบ"] } }, { status: 401 });
-  if (!canManageMasterData(user)) {
+  if (user.role !== "GLOBAL_ADMIN" && user.role !== "PROVINCIAL_ADMIN") {
     return NextResponse.json({ error: { formErrors: [ACCESS_DENIED_MESSAGE] } }, { status: 403 });
   }
 
   const { id } = await params;
   const villageId = Number(id);
-  const village = await prisma.village.findUnique({ where: { id: villageId } });
+  const village = await prisma.village.findUnique({
+    where: { id: villageId },
+    include: { subDistrict: { select: { district: { select: { provinceId: true } } } } },
+  });
   if (!village) return NextResponse.json({ error: { formErrors: ["ไม่พบหมู่บ้านที่ระบุ"] } }, { status: 404 });
+  if (!canManageVillageInProvince(user, village.subDistrict.district.provinceId)) {
+    return NextResponse.json({ error: { formErrors: [ACCESS_DENIED_MESSAGE] } }, { status: 403 });
+  }
 
   const body = await request.json();
   const parsed = updateVillageSchema.safeParse(body);
@@ -39,7 +45,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: { formErrors: ["กรุณาเข้าสู่ระบบ"] } }, { status: 401 });
-  if (!canManageMasterData(user)) {
+  if (user.role !== "GLOBAL_ADMIN" && user.role !== "PROVINCIAL_ADMIN") {
     return NextResponse.json({ error: { formErrors: [ACCESS_DENIED_MESSAGE] } }, { status: 403 });
   }
 
@@ -47,9 +53,15 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const villageId = Number(id);
   const village = await prisma.village.findUnique({
     where: { id: villageId },
-    include: { _count: { select: { households: true, scopeUsers: true, bankAccounts: true } } },
+    include: {
+      subDistrict: { select: { district: { select: { provinceId: true } } } },
+      _count: { select: { households: true, scopeUsers: true, bankAccounts: true } },
+    },
   });
   if (!village) return NextResponse.json({ error: { formErrors: ["ไม่พบหมู่บ้านที่ระบุ"] } }, { status: 404 });
+  if (!canManageVillageInProvince(user, village.subDistrict.district.provinceId)) {
+    return NextResponse.json({ error: { formErrors: [ACCESS_DENIED_MESSAGE] } }, { status: 403 });
+  }
 
   const { households, scopeUsers, bankAccounts } = village._count;
   if (households > 0 || scopeUsers > 0 || bankAccounts > 0) {
