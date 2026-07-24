@@ -18,8 +18,8 @@ export function ThaiDateField({
   hint,
   value,
   onChange,
-  fromBeYearOffset = -10,
-  toBeYearOffset = 2,
+  fromBeYearOffset = 0,
+  toBeYearOffset = 10,
 }: {
   label: string;
   required?: boolean;
@@ -27,9 +27,10 @@ export function ThaiDateField({
   hint?: string;
   value?: string;
   onChange: (isoDate: string | undefined) => void;
-  /** ปีเริ่มต้นของตัวเลือก คิดจากปีปัจจุบัน (พ.ศ.) + offset นี้ */
+  /** ปีเริ่มต้นของตัวเลือก คิดจากปีปัจจุบัน (พ.ศ.) + offset นี้ — ค่าเริ่มต้น 0 = ปีปัจจุบัน (ใช้กับวันที่ทำรายการ/
+   * เอกสารทั่วไปที่ควรเป็นปัจจุบันหรืออนาคตอันใกล้ ไม่ใช่วันเกิด — วันเกิดต้องส่ง offset ติดลบมากเอง เช่น -100) */
   fromBeYearOffset?: number;
-  /** ปีสุดท้ายของตัวเลือก คิดจากปีปัจจุบัน (พ.ศ.) + offset นี้ */
+  /** ปีสุดท้ายของตัวเลือก คิดจากปีปัจจุบัน (พ.ศ.) + offset นี้ — ค่าเริ่มต้น 10 = ปีปัจจุบัน + 10 ปี */
   toBeYearOffset?: number;
 }) {
   const nowBe = currentBeYear();

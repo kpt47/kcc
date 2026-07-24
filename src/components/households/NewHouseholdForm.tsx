@@ -161,7 +161,13 @@ export function NewHouseholdForm({ lockedVillage }: { lockedVillage: { id: numbe
               control={control}
               name="birthDate"
               render={({ field }) => (
-                <ThaiDateField label="วันเดือนปีเกิด" value={field.value} onChange={field.onChange} />
+                <ThaiDateField
+                  label="วันเดือนปีเกิด"
+                  value={field.value}
+                  onChange={field.onChange}
+                  fromBeYearOffset={-100}
+                  toBeYearOffset={-19}
+                />
               )}
             />
           </div>
