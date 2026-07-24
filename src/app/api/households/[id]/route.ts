@@ -3,7 +3,8 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getAllowedVillageIds } from "@/lib/scope";
-import { ACCESS_DENIED_MESSAGE, canEditHousehold } from "@/lib/authz";
+import { ACCESS_DENIED_MESSAGE, canEditHousehold, canViewHouseholdPhoneNumber } from "@/lib/authz";
+import { PHONE_REGEX } from "@/lib/schemas";
 
 // อัปเดตเฉพาะฟิลด์ที่แก้ไขได้หลังลงทะเบียนแล้ว — villageId/sequenceNo กำหนดตัวตนของ record จึงไม่เปิดให้แก้ที่นี่
 const updateHouseholdSchema = z.object({
@@ -15,6 +16,11 @@ const updateHouseholdSchema = z.object({
   birthDate: z.string().optional(),
   occupation: z.string().trim().optional(),
   specialSkills: z.string().trim().optional(),
+  phoneNumber: z
+    .string()
+    .trim()
+    .optional()
+    .refine((v) => !v || PHONE_REGEX.test(v), "เบอร์โทรศัพท์ต้องเป็นตัวเลข 9-10 หลัก และขึ้นต้นด้วย 0"),
   houseNo: z.string().optional(),
   memberCount: z.number().int().min(1).max(30).optional(),
   incomeBeforeLoan: z.number().min(0).max(10_000_000).optional(),

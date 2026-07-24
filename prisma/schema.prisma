@@ -284,6 +284,7 @@ model TargetHousehold {
   birthDate         DateTime? // วันเดือนปีเกิด — ใช้คำนวณอายุปัจจุบันอัตโนมัติตอนยื่นแบบเสนอโครงการ/ขอยืมเงินทุน
   occupation        String? // อาชีพ — ดึงไปเติมอัตโนมัติในแบบเสนอโครงการ/แบบขอยืมเงินทุน (แก้ไขทับได้)
   specialSkills     String? // ความสามารถพิเศษ
+  phoneNumber       String? // เบอร์โทรศัพท์ครัวเรือน — เห็นได้เฉพาะบางบทบาทเท่านั้น (ดู canViewHouseholdPhoneNumber ใน lib/authz.ts)
   houseNo           String? // บ้านเลขที่
   memberCount       Int? // จำนวนสมาชิกในครัวเรือน
   incomeBeforeLoan  Float? // รายได้เฉลี่ยต่อคนต่อปีตามเกณฑ์ จปฐ. ก่อนยืมเงิน (บาท)

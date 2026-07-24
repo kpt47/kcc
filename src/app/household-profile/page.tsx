@@ -122,6 +122,10 @@ export default async function HouseholdProfilePage() {
               <dd className="font-medium text-slate-900 dark:text-slate-100">{profileView.houseNumber ?? "-"}</dd>
             </div>
             <div className="flex justify-between gap-4">
+              <dt className="text-slate-500 dark:text-slate-400">เบอร์โทรศัพท์ครัวเรือน</dt>
+              <dd className="font-medium text-slate-900 dark:text-slate-100">{household.phoneNumber ?? "-"}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
               <dt className="text-slate-500 dark:text-slate-400">หมู่ที่</dt>
               <dd className="font-medium text-slate-900 dark:text-slate-100">{profileView.moo}</dd>
             </div>

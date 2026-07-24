@@ -288,6 +288,11 @@ export const householdSchema = z
     birthDate: optionalIsoDate,
     occupation: z.string().trim().optional(),
     specialSkills: z.string().trim().optional(),
+    phoneNumber: z
+      .string()
+      .trim()
+      .optional()
+      .refine((v) => !v || PHONE_REGEX.test(v), "เบอร์โทรศัพท์ต้องเป็นตัวเลข 9-10 หลัก และขึ้นต้นด้วย 0"),
     houseNo: z.string().optional(),
     memberCount: optionalNumber(
       z.number().int("จำนวนสมาชิกต้องเป็นจำนวนเต็ม").min(1, "ต้องมีอย่างน้อย 1 คน").max(30, "จำนวนสมาชิกไม่ถูกต้อง")
@@ -321,6 +326,7 @@ export interface HouseholdFormValues {
   birthDate?: string;
   occupation?: string;
   specialSkills?: string;
+  phoneNumber?: string;
   houseNo?: string;
   memberCount?: number;
   incomeBeforeLoan?: number;
@@ -341,6 +347,7 @@ export interface HouseholdSubmitValues {
   birthDate?: string;
   occupation?: string;
   specialSkills?: string;
+  phoneNumber?: string;
   houseNo?: string;
   memberCount?: number;
   incomeBeforeLoan?: number;

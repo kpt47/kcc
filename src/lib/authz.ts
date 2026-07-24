@@ -83,6 +83,23 @@ export function canEditHousehold(user: Pick<CurrentUser, "role">): boolean {
 }
 
 /**
+ * เบอร์โทรศัพท์ครัวเรือน (ทะเบียนครัวเรือนเป้าหมาย เล่มม่วง) — ข้อมูลส่วนบุคคลที่จำกัดการมองเห็นแคบกว่า
+ * ฟิลด์อื่นในระเบียนเดียวกัน เห็นได้เฉพาะ: ครัวเรือนเจ้าของข้อมูลเอง, ประธาน/เลขานุการ/ฝ่ายการเงินของหมู่บ้านนั้น,
+ * พัฒนากรตำบล และผู้บริหารอำเภอ เท่านั้น — ไม่รวมกรรมการทั่วไป จังหวัด ส่วนกลาง หรือ IT_SUPPORT
+ * (การกรอง scope ระดับ "เห็นครัวเรือนไหนได้บ้าง" ยังคงเป็นหน้าที่ของ scope.ts ตามปกติ ฟังก์ชันนี้ควบคุมเฉพาะ
+ * ฟิลด์นี้ฟิลด์เดียวซ้อนอีกชั้นหนึ่งเท่านั้น)
+ */
+export function canViewHouseholdPhoneNumber(user: Pick<CurrentUser, "role" | "committeeRole">): boolean {
+  if (user.role === "HOUSEHOLD") return true;
+  if (user.role === "VILLAGE_COMMITTEE") {
+    return (
+      user.committeeRole === "CHAIRMAN" || user.committeeRole === "SECRETARY" || user.committeeRole === "FINANCE_MEMBER"
+    );
+  }
+  return user.role === "SUB_DISTRICT_ADMIN" || user.role === "DISTRICT_ADMIN";
+}
+
+/**
  * บัญชีคุมลูกหนี้ (เล่มเหลือง): บันทึกรายการยืมเงิน (การจ่ายเงินยืมก้อนใหม่) — เฉพาะเลขานุการ
  * (SECRETARY) เท่านั้น ไม่มีสิทธิ์ override จากตำแหน่งอื่นอีกต่อไป
  */

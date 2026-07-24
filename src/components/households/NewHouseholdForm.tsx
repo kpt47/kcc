@@ -180,6 +180,13 @@ export function NewHouseholdForm({ lockedVillage }: { lockedVillage: { id: numbe
             />
           </div>
           <TextField
+            label="เบอร์โทรศัพท์ครัวเรือน"
+            type="tel"
+            hint="เห็นได้เฉพาะครัวเรือนเอง ประธาน/เลขานุการ/ฝ่ายการเงิน พัฒนากรตำบล และผู้บริหารอำเภอเท่านั้น"
+            error={errors.phoneNumber?.message}
+            {...register("phoneNumber")}
+          />
+          <TextField
             label="จำนวนสมาชิกในครัวเรือน (คน)"
             type="number"
             inputMode="numeric"

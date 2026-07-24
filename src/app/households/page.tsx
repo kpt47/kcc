@@ -9,7 +9,13 @@ import { getHouseholdStarRating } from "@/lib/rating";
 import { prisma } from "@/lib/prisma";
 import { THEMES } from "@/lib/theme";
 import { requireUser } from "@/lib/auth";
-import { canCreateHousehold, canImportHouseholds, isItSupportBlockedFromProgramData, IT_SUPPORT_DENIED_MESSAGE } from "@/lib/authz";
+import {
+  canCreateHousehold,
+  canImportHouseholds,
+  canViewHouseholdPhoneNumber,
+  isItSupportBlockedFromProgramData,
+  IT_SUPPORT_DENIED_MESSAGE,
+} from "@/lib/authz";
 import { getAllowedVillageIds, householdSelfScopeWhere } from "@/lib/scope";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +38,7 @@ export default async function HouseholdsPage() {
   const theme = THEMES.purple;
   const showCreateLink = canCreateHousehold(user);
   const showImport = canImportHouseholds(user);
+  const showPhoneNumber = canViewHouseholdPhoneNumber(user);
   const households = await prisma.targetHousehold.findMany({
     where: householdSelfScopeWhere(user, scope),
     orderBy: [{ villageId: "asc" }, { sequenceNo: "asc" }],
@@ -86,6 +93,7 @@ export default async function HouseholdsPage() {
               { key: "sequenceNo", label: "ลำดับที่", align: "center" },
               { key: "name", label: "ชื่อ-สกุล" },
               { key: "houseNo", label: "บ้านเลขที่" },
+              ...(showPhoneNumber ? [{ key: "phoneNumber", label: "โทรศัพท์" } as EntityColumnDef] : []),
               { key: "isDefaulted", label: "สถานะ", align: "center" },
               { key: "contractStars", label: "สถานะสัญญา", align: "center" },
               { key: "incomeBeforeLoan", label: "รายได้ก่อนยืม", align: "right" },
@@ -101,6 +109,7 @@ export default async function HouseholdsPage() {
                 sequenceNo: h.sequenceNo,
                 name: `${h.headFirstName} ${h.headLastName}`,
                 houseNo: h.houseNo ?? "",
+                ...(showPhoneNumber ? { phoneNumber: h.phoneNumber ?? "" } : {}),
                 isDefaulted: h.isDefaulted ? 1 : 0,
                 contractStars: rating?.stars ?? -1,
                 incomeBeforeLoan: h.incomeBeforeLoan ?? -1,
@@ -111,6 +120,7 @@ export default async function HouseholdsPage() {
                 sequenceNo: h.sequenceNo,
                 name: `${h.headFirstName} ${h.headLastName}`,
                 houseNo: h.houseNo ?? "-",
+                ...(showPhoneNumber ? { phoneNumber: h.phoneNumber ?? "-" } : {}),
                 isDefaulted: h.isDefaulted ? (
                   <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">ผิดสัญญา</span>
                 ) : (
@@ -151,6 +161,7 @@ export default async function HouseholdsPage() {
                     )}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+                    {showPhoneNumber && <span>โทรศัพท์: {h.phoneNumber ?? "-"}</span>}
                     <span>
                       รายได้ก่อนยืม: {h.incomeBeforeLoan != null ? `${h.incomeBeforeLoan.toLocaleString("th-TH")} บาท` : "-"}
                     </span>
