@@ -14,7 +14,7 @@ import { HouseholdSelect, type HouseholdOption } from "@/components/form/Househo
 import { loanRequestSchema, LOAN_REQUEST_STEP_FIELDS, type LoanRequestFormValues, type LoanRequestSubmitValues } from "@/lib/schemas";
 import { thaiBahtText, calculateAge } from "@/lib/thai";
 import { formatThaiDate } from "@/lib/formatDate";
-import { LOAN_CEILING_DEFAULT } from "@/lib/config";
+import { LOAN_CEILING_DEFAULT, MAX_REPAYMENT_YEARS } from "@/lib/config";
 import { alertDialog, confirmDialog } from "@/lib/confirmDialog";
 import { computeRepaymentDueDate, computeMonthlyInstallment, monthsBetween } from "@/lib/loanSchedule";
 
@@ -56,6 +56,9 @@ function NewLoanRequestForm() {
   );
   const [linkedProposal, setLinkedProposal] = useState<LinkedProposal | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
+  // วันครบกำหนดชำระเงินทั้งหมด: ค่าเริ่มต้นตามวันที่ยื่นคำขอ (+MAX_REPAYMENT_YEARS) แต่ครัวเรือนแก้ไขเองได้ —
+  // เมื่อแก้เองแล้วครั้งหนึ่ง จะไม่ auto-update ตามวันที่ยื่นคำขอที่เปลี่ยนภายหลังอีก (เคารพค่าที่เลือกเอง)
+  const [dueDateTouched, setDueDateTouched] = useState(false);
 
   const {
     register,
@@ -70,27 +73,50 @@ function NewLoanRequestForm() {
     defaultValues: { agreesToRegulations: false },
   });
 
+  const requestedAmountField = register("requestedAmount", { valueAsNumber: true });
+
   const values = watch();
   const amountCeiling =
     linkedProposal?.committeeAmount != null
       ? Math.min(LOAN_CEILING_DEFAULT, linkedProposal.committeeAmount)
       : LOAN_CEILING_DEFAULT;
 
-  // ตัวอย่างวันครบกำหนดชำระเงินทั้งหมด + ยอดผ่อนชำระต่อเดือน — คำนวณสดจากวันที่ยื่นคำขอ/จำนวนเงินที่กรอกไว้
-  // แล้วเก็บค่าจริงตอนบันทึกที่ฝั่ง server (ดู POST /api/loan-requests) ให้ตรงกับที่แสดงไว้ตรงนี้เป๊ะ
+  // ยอดชำระต่อเดือน (โดยประมาณ) เป็นค่าคำนวณอัตโนมัติเสมอ — มาจากวันที่ยื่นคำขอ, วันครบกำหนดชำระที่ครัวเรือน
+  // กรอกเอง (หรือค่าเริ่มต้นที่ยังไม่ได้แก้ไข) และจำนวนเงินที่ขอยืม ไม่ให้แก้ไขค่านี้ตรงๆ
   const requestDateObj = values.requestDate ? new Date(values.requestDate) : null;
+  const dueDateObj = values.repaymentDueDate ? new Date(values.repaymentDueDate) : null;
   const repaymentPreview =
-    requestDateObj && values.requestedAmount > 0
+    requestDateObj && dueDateObj && values.requestedAmount > 0
       ? {
-          dueDate: computeRepaymentDueDate(requestDateObj),
-          months: monthsBetween(requestDateObj, computeRepaymentDueDate(requestDateObj)),
-          monthlyInstallment: computeMonthlyInstallment(
-            values.requestedAmount,
-            requestDateObj,
-            computeRepaymentDueDate(requestDateObj)
-          ),
+          months: monthsBetween(requestDateObj, dueDateObj),
+          monthlyInstallment: computeMonthlyInstallment(values.requestedAmount, requestDateObj, dueDateObj),
         }
       : null;
+
+  // ตรวจสอบยอดขอยืมเทียบกับวงเงินที่ประธานกรรมการอนุมัติไว้ในแบบเสนอโครงการที่อ้างอิง — เรียกทั้งตอนออกจากช่อง
+  // จำนวนเงิน (onBlur) และตอนกดถัดไป เพื่อให้เตือนทันทีไม่ต้องรอเปลี่ยนหน้าก่อน
+  async function checkAmountAgainstCeiling(): Promise<boolean> {
+    if (!linkedProposal?.committeeAmount) return true;
+    const amount = values.requestedAmount;
+    if (!amount) return true;
+    const ceiling = linkedProposal.committeeAmount;
+    if (amount > ceiling) {
+      await alertDialog({
+        title: "วงเงินเกินกว่าที่อนุมัติ",
+        text: `วงเงินที่กรอก (${amount.toLocaleString("th-TH")} บาท) เกินกว่าวงเงินที่ประธานกรรมการอนุมัติไว้ในแบบเสนอโครงการนี้ (${ceiling.toLocaleString("th-TH")} บาท) กรุณาแก้ไขจำนวนเงินก่อนดำเนินการต่อ`,
+        tone: "danger",
+      });
+      return false;
+    }
+    if (amount < ceiling) {
+      return await confirmDialog({
+        title: "ยอดเงินน้อยกว่าที่อนุมัติ",
+        text: `วงเงินที่กรอก (${amount.toLocaleString("th-TH")} บาท) น้อยกว่าวงเงินที่ประธานกรรมการอนุมัติไว้ (${ceiling.toLocaleString("th-TH")} บาท) ต้องการดำเนินการต่อด้วยยอดนี้หรือไม่?`,
+        confirmButtonText: "ดำเนินการต่อ",
+      });
+    }
+    return true;
+  }
 
   // ยื่นผ่านลิงก์ในการแจ้งเตือนอนุมัติแบบเสนอโครงการ (?proposalId=...) — ดึงเล่มที่/โครงการที่/วงเงินที่อนุมัติ
   // และผู้ให้ความยินยอมของครัวเรือนนั้นมาเติมให้อัตโนมัติ ไม่ต้องกรอกซ้ำ
@@ -143,28 +169,9 @@ function NewLoanRequestForm() {
     const valid = await trigger(fieldNames);
     if (!valid) return;
 
-    // ขั้นตอน "จำนวนเงินที่ขอยืม": ถ้าอ้างอิงแบบเสนอโครงการที่อนุมัติแล้ว เตือนทันทีถ้ายอดที่กรอกไม่ตรงกับ
-    // วงเงินที่ประธานกรรมการอนุมัติไว้ — เกินวงเงิน: บล็อกให้แก้ไขก่อน (server จะปฏิเสธอยู่แล้ว แต่เตือนไว
-    // กว่าให้แก้ตั้งแต่ตรงนี้), น้อยกว่าวงเงิน: แค่ถามยืนยันเผื่อพิมพ์ผิด ยังเลือกยื่นน้อยกว่าที่อนุมัติได้ตามจริง
-    if (step === 1 && linkedProposal?.committeeAmount != null) {
-      const amount = values.requestedAmount;
-      const ceiling = linkedProposal.committeeAmount;
-      if (amount > ceiling) {
-        await alertDialog({
-          title: "วงเงินเกินกว่าที่อนุมัติ",
-          text: `วงเงินที่กรอก (${amount.toLocaleString("th-TH")} บาท) เกินกว่าวงเงินที่ประธานกรรมการอนุมัติไว้ในแบบเสนอโครงการนี้ (${ceiling.toLocaleString("th-TH")} บาท) กรุณาแก้ไขจำนวนเงินก่อนดำเนินการต่อ`,
-          tone: "danger",
-        });
-        return;
-      }
-      if (amount < ceiling) {
-        const proceed = await confirmDialog({
-          title: "ยอดเงินน้อยกว่าที่อนุมัติ",
-          text: `วงเงินที่กรอก (${amount.toLocaleString("th-TH")} บาท) น้อยกว่าวงเงินที่ประธานกรรมการอนุมัติไว้ (${ceiling.toLocaleString("th-TH")} บาท) ต้องการดำเนินการต่อด้วยยอดนี้หรือไม่?`,
-          confirmButtonText: "ดำเนินการต่อ",
-        });
-        if (!proceed) return;
-      }
+    if (step === 1) {
+      const ok = await checkAmountAgainstCeiling();
+      if (!ok) return;
     }
 
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -280,7 +287,11 @@ function NewLoanRequestForm() {
               max={amountCeiling}
               error={errors.requestedAmount?.message}
               amountValue={values.requestedAmount}
-              {...register("requestedAmount", { valueAsNumber: true })}
+              {...requestedAmountField}
+              onBlur={(e) => {
+                requestedAmountField.onBlur(e);
+                checkAmountAgainstCeiling();
+              }}
             />
 
             <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3">
@@ -312,7 +323,14 @@ function NewLoanRequestForm() {
                   label="วันที่ยื่นคำขอ"
                   required
                   value={field.value}
-                  onChange={field.onChange}
+                  onChange={(v) => {
+                    field.onChange(v);
+                    // ยังไม่เคยแก้ไขวันครบกำหนดชำระเอง — ตั้งค่าเริ่มต้นให้ตามวันที่ยื่นคำขอใหม่นี้อัตโนมัติ
+                    if (!dueDateTouched && v) {
+                      const due = computeRepaymentDueDate(new Date(v));
+                      setValue("repaymentDueDate", due.toISOString().slice(0, 10));
+                    }
+                  }}
                 />
               )}
             />
@@ -328,11 +346,28 @@ function NewLoanRequestForm() {
               {...register("paymentDayOfMonth", { valueAsNumber: true })}
             />
 
+            <Controller
+              control={control}
+              name="repaymentDueDate"
+              render={({ field }) => (
+                <ThaiDateField
+                  label="2. วันครบกำหนดชำระเงินทั้งหมด"
+                  required
+                  hint={`ค่าเริ่มต้น: วันที่ยื่นคำขอ + ${MAX_REPAYMENT_YEARS} ปี — แก้ไขเองได้ตามที่ตกลงกับคณะกรรมการ`}
+                  error={errors.repaymentDueDate?.message}
+                  toBeYearOffset={MAX_REPAYMENT_YEARS + 1}
+                  value={field.value}
+                  onChange={(v) => {
+                    field.onChange(v);
+                    setDueDateTouched(true);
+                  }}
+                />
+              )}
+            />
+
             {repaymentPreview && (
               <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4">
-                <p className="text-sm font-bold text-emerald-800">2. วันครบกำหนดชำระเงินทั้งหมด</p>
-                <p className="text-2xl font-extrabold text-emerald-900">{formatThaiDate(repaymentPreview.dueDate)}</p>
-                <p className="mt-3 text-sm font-bold text-emerald-800">3. ยอดชำระต่อเดือน (โดยประมาณ)</p>
+                <p className="text-sm font-bold text-emerald-800">3. ยอดชำระต่อเดือน (โดยประมาณ) — คำนวณอัตโนมัติ</p>
                 <p className="text-2xl font-extrabold text-emerald-900">
                   {repaymentPreview.monthlyInstallment.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท/เดือน
                 </p>
@@ -372,14 +407,12 @@ function NewLoanRequestForm() {
                   label="ตกลงชำระทุกๆวันที่"
                   value={values.paymentDayOfMonth ? `วันที่ ${values.paymentDayOfMonth} ของทุกเดือน` : undefined}
                 />
+                <ReviewRow label="วันครบกำหนดชำระเงินทั้งหมด" value={formatThaiDate(values.repaymentDueDate)} />
                 {repaymentPreview && (
-                  <>
-                    <ReviewRow label="วันครบกำหนดชำระเงินทั้งหมด" value={formatThaiDate(repaymentPreview.dueDate)} />
-                    <ReviewRow
-                      label="ยอดชำระต่อเดือน (โดยประมาณ)"
-                      value={`${repaymentPreview.monthlyInstallment.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท (${repaymentPreview.months} เดือน)`}
-                    />
-                  </>
+                  <ReviewRow
+                    label="ยอดชำระต่อเดือน (โดยประมาณ)"
+                    value={`${repaymentPreview.monthlyInstallment.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท (${repaymentPreview.months} เดือน)`}
+                  />
                 )}
               </dl>
             </section>
