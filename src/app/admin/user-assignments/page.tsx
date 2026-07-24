@@ -11,36 +11,37 @@ export const dynamic = "force-dynamic";
 
 const ASSIGNMENT_ROLES: GlobalRole[] = ["PROVINCIAL_ADMIN", "DISTRICT_ADMIN", "SUB_DISTRICT_ADMIN"];
 
-// หาว่า User แต่ละคน (พัฒนาการจังหวัด/พัฒนาการอำเภอ/พัฒนากรตำบล) สังกัดจังหวัดใด — ใช้กรองข้อมูลให้
-// พัฒนาการจังหวัดเห็นเฉพาะบัญชีในจังหวัดของตนเอง (พัฒนาการจังหวัดเทียบ scopeProvinceId ตรงๆ, พัฒนาการอำเภอ/
-// พัฒนากรตำบล ต้องไล่ผ่าน District/SubDistrict เพราะ scope ของแต่ละคนเก็บแค่ระดับของตนเอง ไม่มี scopeProvinceId ซ้ำ)
-async function resolveProvinceIds(
-  users: { role: GlobalRole; scopeProvinceId: number | null; scopeDistrictId: number | null; scopeSubDistrictId: number | null }[]
-): Promise<Map<number | null, number | null>> {
-  const districtIds = users.filter((u) => u.role === "DISTRICT_ADMIN" && u.scopeDistrictId).map((u) => u.scopeDistrictId!);
-  const subDistrictIds = users
-    .filter((u) => u.role === "SUB_DISTRICT_ADMIN" && u.scopeSubDistrictId)
-    .map((u) => u.scopeSubDistrictId!);
+type AssignmentUser = {
+  id: number;
+  role: GlobalRole;
+  createdAt: Date;
+  scopeProvinceId: number | null;
+  scopeProvince: { name: string } | null;
+  scopeDistrict: { name: string; province: { id: number; name: string } } | null;
+  scopeSubDistrict: { name: string; district: { name: string; province: { id: number; name: string } } } | null;
+  officialProfile: { titlePrefix: string | null; titlePrefixOther: string | null; firstName: string; lastName: string } | null;
+};
 
-  const [districts, subDistricts] = await Promise.all([
-    prisma.district.findMany({ where: { id: { in: districtIds } }, select: { id: true, provinceId: true } }),
-    prisma.subDistrict.findMany({
-      where: { id: { in: subDistrictIds } },
-      select: { id: true, district: { select: { provinceId: true } } },
-    }),
-  ]);
-  const districtProvince = new Map(districts.map((d) => [d.id, d.provinceId]));
-  const subDistrictProvince = new Map(subDistricts.map((s) => [s.id, s.district.provinceId]));
-
-  const result = new Map<number | null, number | null>();
-  for (const u of users) {
-    let provinceId: number | null = null;
-    if (u.role === "PROVINCIAL_ADMIN") provinceId = u.scopeProvinceId;
-    else if (u.role === "DISTRICT_ADMIN" && u.scopeDistrictId) provinceId = districtProvince.get(u.scopeDistrictId) ?? null;
-    else if (u.role === "SUB_DISTRICT_ADMIN" && u.scopeSubDistrictId) provinceId = subDistrictProvince.get(u.scopeSubDistrictId) ?? null;
-    result.set(u.scopeDistrictId ?? u.scopeSubDistrictId ?? u.scopeProvinceId, provinceId);
+// พื้นที่ตำบล/อำเภอ/จังหวัดของ User แต่ละคน — เก็บแค่ระดับของตนเองตาม role (พัฒนาการจังหวัดมีแค่จังหวัด,
+// พัฒนาการอำเภอมีอำเภอ+จังหวัด, พัฒนากรตำบลมีครบทั้งสามระดับ) พร้อม provinceId ไว้กรองสิทธิ์ของพัฒนาการจังหวัด
+function areaOf(u: AssignmentUser): { subDistrict: string; district: string; province: string; provinceId: number | null } {
+  if (u.role === "PROVINCIAL_ADMIN") {
+    return { subDistrict: "-", district: "-", province: u.scopeProvince?.name ?? "-", provinceId: u.scopeProvinceId };
   }
-  return result;
+  if (u.role === "DISTRICT_ADMIN") {
+    return {
+      subDistrict: "-",
+      district: u.scopeDistrict?.name ?? "-",
+      province: u.scopeDistrict?.province.name ?? "-",
+      provinceId: u.scopeDistrict?.province.id ?? null,
+    };
+  }
+  return {
+    subDistrict: u.scopeSubDistrict?.name ?? "-",
+    district: u.scopeSubDistrict?.district.name ?? "-",
+    province: u.scopeSubDistrict?.district.province.name ?? "-",
+    provinceId: u.scopeSubDistrict?.district.province.id ?? null,
+  };
 }
 
 export default async function UserAssignmentsPage() {
@@ -55,7 +56,7 @@ export default async function UserAssignmentsPage() {
     );
   }
 
-  const usersRaw = await prisma.user.findMany({
+  const usersRaw: AssignmentUser[] = await prisma.user.findMany({
     where: { role: { in: ASSIGNMENT_ROLES } },
     orderBy: { createdAt: "asc" },
     select: {
@@ -63,44 +64,64 @@ export default async function UserAssignmentsPage() {
       role: true,
       createdAt: true,
       scopeProvinceId: true,
-      scopeDistrictId: true,
-      scopeSubDistrictId: true,
+      scopeProvince: { select: { name: true } },
+      scopeDistrict: { select: { name: true, province: { select: { id: true, name: true } } } },
+      scopeSubDistrict: { select: { name: true, district: { select: { name: true, province: { select: { id: true, name: true } } } } } },
       officialProfile: { select: { titlePrefix: true, titlePrefixOther: true, firstName: true, lastName: true } },
     },
   });
 
   // พัฒนาการจังหวัดเห็นเฉพาะบัญชีในจังหวัดของตนเอง — กรมเห็นทั่วประเทศ
-  let visibleUsers = usersRaw;
-  if (user.role === "PROVINCIAL_ADMIN") {
-    const provinceMap = await resolveProvinceIds(usersRaw);
-    visibleUsers = usersRaw.filter((u) => {
-      const key = u.scopeDistrictId ?? u.scopeSubDistrictId ?? u.scopeProvinceId;
-      return provinceMap.get(key) === user.scopeProvinceId;
-    });
-  }
+  const visibleUsers =
+    user.role === "PROVINCIAL_ADMIN"
+      ? usersRaw.filter((u) => areaOf(u).provinceId === user.scopeProvinceId)
+      : usersRaw;
 
   const columns: DataListColumnDef[] = [
     { key: "no", label: "ลำดับ", align: "center" },
     { key: "assignedDate", label: "วันเดือนปีที่มอบหมายงาน" },
     { key: "position", label: "ตำแหน่ง" },
     { key: "name", label: "ชื่อ-สกุล" },
+    { key: "subDistrict", label: "ตำบล" },
+    { key: "district", label: "อำเภอ" },
+    { key: "province", label: "จังหวัด" },
   ];
 
   const rows: DataListRow[] = visibleUsers.map((u, index) => {
     const positionLabel = ROLE_LABELS[u.role];
     const name = u.officialProfile ? formatOfficialName(u.officialProfile) : "-";
     const assignedDate = formatThaiDate(u.createdAt);
+    const area = areaOf(u);
     return {
       key: u.id,
-      searchText: [positionLabel, name, assignedDate].join(" ").toLowerCase(),
-      sortValues: { no: index + 1, assignedDate: u.createdAt.getTime(), position: positionLabel, name },
-      cells: { no: index + 1, assignedDate, position: positionLabel, name },
+      searchText: [positionLabel, name, assignedDate, area.subDistrict, area.district, area.province].join(" ").toLowerCase(),
+      sortValues: {
+        no: index + 1,
+        assignedDate: u.createdAt.getTime(),
+        position: positionLabel,
+        name,
+        subDistrict: area.subDistrict,
+        district: area.district,
+        province: area.province,
+      },
+      cells: {
+        no: index + 1,
+        assignedDate,
+        position: positionLabel,
+        name,
+        subDistrict: area.subDistrict,
+        district: area.district,
+        province: area.province,
+      },
       card: (
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-base font-bold text-slate-900">
             {index + 1}. {name}
           </p>
           <p className="text-sm text-slate-600">{positionLabel}</p>
+          <p className="text-sm text-slate-500">
+            ต.{area.subDistrict} อ.{area.district} จ.{area.province}
+          </p>
           <p className="text-sm text-slate-500">วันเดือนปีที่มอบหมายงาน: {assignedDate}</p>
         </div>
       ),
@@ -121,7 +142,7 @@ export default async function UserAssignmentsPage() {
           rows={rows}
           columns={columns}
           defaultSortField="no"
-          searchPlaceholder="ค้นหาตำแหน่ง, ชื่อ-สกุล, วันที่..."
+          searchPlaceholder="ค้นหาตำแหน่ง, ชื่อ-สกุล, ตำบล, อำเภอ, จังหวัด..."
           emptyMessage="ไม่พบข้อมูลที่ตรงกับการค้นหานี้"
         />
       )}
