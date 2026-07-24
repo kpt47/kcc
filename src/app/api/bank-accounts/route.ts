@@ -4,6 +4,7 @@ import { bankAccountRequestSchema } from "@/lib/schemas";
 import { getCurrentUser } from "@/lib/auth";
 import { getAllowedVillageIds } from "@/lib/scope";
 import { ACCESS_DENIED_MESSAGE, canRequestBankAccount } from "@/lib/authz";
+import { notifyUsers } from "@/lib/notifications/notifyUsers";
 
 // บัญชีคุมเงินฝาก (เล่มเขียว): ยื่นคำขอเปิดบัญชีธนาคารใหม่ให้หมู่บ้าน — เลขานุการหรือฝ่ายการเงินเป็นผู้ยื่น
 // บัญชีที่สร้างยังบันทึกรายการฝาก-ถอนไม่ได้จนกว่าจะผ่านการลงนามอนุมัติครบ 2 ฝ่าย (ดู /api/bank-accounts/[id]/approve)
@@ -42,5 +43,18 @@ export async function POST(request: Request) {
       requestedById: user.id,
     },
   });
+
+  // แจ้งเตือนประธานและฝ่ายการเงินของหมู่บ้านนี้ — ทั้งสองฝ่ายต้องลงนามอนุมัติก่อนบัญชีจะใช้งานได้
+  const signers = await prisma.user.findMany({
+    where: { role: "VILLAGE_COMMITTEE", committeeRole: { in: ["CHAIRMAN", "FINANCE_MEMBER"] }, scopeVillageId: data.villageId },
+    select: { id: true },
+  });
+  await notifyUsers(
+    signers.map((s) => s.id),
+    `แจ้งเตือน: มีคำขอเปิดบัญชีธนาคารใหม่ "${data.bankName}" รอลงนามอนุมัติจากท่าน (ต้องลงนามครบทั้งประธานและฝ่ายการเงิน)`,
+    "ALERT",
+    "/bank-accounts"
+  );
+
   return NextResponse.json(account, { status: 201 });
 }

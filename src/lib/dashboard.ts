@@ -69,9 +69,10 @@ export const DASHBOARD_MENUS: DashboardMenuItem[] = [
     href: "/bank-accounts",
     theme: "green",
     roles: OVERSIGHT_ROLES,
-    // ในระดับกรรมการหมู่บ้าน เห็นเมนูเล่มเขียวได้เฉพาะฝ่ายการเงิน (FINANCE_MEMBER) เท่านั้น — ประธาน/เลขาฯ/
-    // กรรมการทั่วไป ไม่เห็นเมนูนี้เลย (ระดับพัฒนากรขึ้นไปยังเห็นตามปกติ ไม่ถูกจำกัดด้วยเงื่อนไขนี้)
-    villageCommitteeRoles: ["FINANCE_MEMBER"],
+    // ในระดับกรรมการหมู่บ้าน เห็นเมนูเล่มเขียวได้เฉพาะฝ่ายการเงิน (FINANCE_MEMBER) และประธาน (CHAIRMAN) เท่านั้น —
+    // ประธานต้องเห็นเมนูนี้ด้วยเพื่อลงนามอนุมัติเปิดบัญชีใหม่ (Multi-signature) — เลขาฯ/กรรมการทั่วไปไม่เห็นเมนูนี้
+    // (ระดับพัฒนากรขึ้นไปยังเห็นตามปกติ ไม่ถูกจำกัดด้วยเงื่อนไขนี้)
+    villageCommitteeRoles: ["FINANCE_MEMBER", "CHAIRMAN"],
   },
   {
     key: "loans",

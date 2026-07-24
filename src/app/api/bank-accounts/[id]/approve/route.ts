@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { getAllowedVillageIds } from "@/lib/scope";
 import { canSignBankAccountAsChairman, canSignBankAccountAsFinance, isBankAccountFullyApproved } from "@/lib/authz";
+import { notifyUsers } from "@/lib/notifications/notifyUsers";
 
 const signSchema = z.object({
   as: z.enum(["chairman", "finance"]),
@@ -54,6 +55,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       where: { id: accountId },
       data: { chairmanApprovedById: user.id, chairmanApprovedAt: new Date() },
     });
+    await notifyAfterSigning(updated);
     return NextResponse.json({ ...updated, isFullyApproved: isBankAccountFullyApproved(updated) });
   }
 
@@ -77,5 +79,38 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     where: { id: accountId },
     data: { financeApprovedById: user.id, financeApprovedAt: new Date() },
   });
+  await notifyAfterSigning(updated);
   return NextResponse.json({ ...updated, isFullyApproved: isBankAccountFullyApproved(updated) });
+}
+
+// หลังลงนามแต่ละครั้ง: ถ้ายังไม่ครบ 2 ฝ่าย แจ้งเตือนอีกฝ่ายที่ยังไม่ได้ลงนามให้มาลงนามต่อ
+// ถ้าครบแล้ว (เปิดบัญชีสมบูรณ์) แจ้งเตือนผู้ยื่นคำขอว่าใช้บันทึกฝาก-ถอนได้แล้ว
+async function notifyAfterSigning(account: {
+  id: number;
+  villageId: number;
+  bankName: string | null;
+  requestedById: number;
+  chairmanApprovedById: number | null;
+  financeApprovedById: number | null;
+}) {
+  if (isBankAccountFullyApproved(account)) {
+    await notifyUsers(
+      [account.requestedById],
+      `บัญชีธนาคาร "${account.bankName ?? ""}" ที่ท่านยื่นคำขอเปิด ได้รับการลงนามอนุมัติครบแล้ว บันทึกรายการฝาก-ถอนได้ทันที`,
+      "ALERT",
+      "/bank-accounts"
+    );
+    return;
+  }
+  const pendingRole = account.chairmanApprovedById === null ? "CHAIRMAN" : "FINANCE_MEMBER";
+  const pendingUsers = await prisma.user.findMany({
+    where: { role: "VILLAGE_COMMITTEE", committeeRole: pendingRole, scopeVillageId: account.villageId },
+    select: { id: true },
+  });
+  await notifyUsers(
+    pendingUsers.map((u) => u.id),
+    `แจ้งเตือน: คำขอเปิดบัญชีธนาคาร "${account.bankName ?? ""}" ได้รับการลงนามจากอีกฝ่ายแล้ว รอลงนามยืนยันจากท่านอีกฝ่ายหนึ่ง`,
+    "ALERT",
+    "/bank-accounts"
+  );
 }
