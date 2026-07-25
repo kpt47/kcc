@@ -5,6 +5,7 @@
 import { SEALS_ROW_BASE64 } from "./assets/sealAssets";
 import { SARABUN_REGULAR_TTF_BASE64, SARABUN_SEMIBOLD_TTF_BASE64, SARABUN_BOLD_TTF_BASE64 } from "./assets/sarabunFontAssets";
 import { BRAND_ALT } from "@/lib/branding";
+import { thaiDateLongParts } from "@/lib/thai";
 
 // ฝังฟอนต์ Sarabun เป็น base64 ตรงในเอกสารแทนการ @import จาก Google Fonts ผ่านเครือข่าย — Chromium แบบย่อขนาด
 // (@sparticuz/chromium) ที่ใช้เรนเดอร์ PDF บน Vercel serverless ไม่มีฟอนต์ไทยติดตั้งมาให้ และการโหลดฟอนต์จาก
@@ -176,6 +177,15 @@ export function fill(value: string | number | null | undefined, opts?: { wide?: 
 /** ช่องทำเครื่องหมาย ( ) แบบฟอร์มกระดาษ เช่น ( x ) เป็นไปได้ */
 export function checkbox(checked: boolean, label: string): string {
   return `(${checked ? "&nbsp;X&nbsp;" : "&nbsp;&nbsp;&nbsp;"}) ${escapeHtml(label)}`;
+}
+
+/**
+ * แสดงวันที่ตามมาตรฐานหนังสือราชการไทย "วันที่ ... เดือน ... พ.ศ. ..." (สะกดชื่อเดือนเต็ม ไม่ใช่ DD/MM/YYYY)
+ * เว้นว่างเป็นเส้นประทั้ง 3 ช่องถ้าไม่มีวันที่
+ */
+export function thaiDateBlank(value: string | Date | null | undefined): string {
+  const parts = thaiDateLongParts(value);
+  return `วันที่${fill(parts?.day)}เดือน${fill(parts?.month, { wide: true })}พ.ศ.${fill(parts?.year)}`;
 }
 
 /**

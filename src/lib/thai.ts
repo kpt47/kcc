@@ -72,6 +72,19 @@ export function formatThaiDate(value: string | Date | null | undefined): string 
   return `${dd}/${mm}/${parts.beYear}`;
 }
 
+/**
+ * แยกวันที่เป็น { day, month, year } ภาษาไทยเต็มรูปแบบ (เช่น { day: "25", month: "กรกฎาคม", year: "2569" })
+ * สำหรับแสดงในเอกสาร PDF ราชการที่ต้องการรูปแบบ "วันที่ ... เดือน ... พ.ศ. ..." (สะกดชื่อเดือน ไม่ใช่ DD/MM/YYYY)
+ * คืนค่า null ถ้าไม่มีวันที่ (ให้เว้นว่างเป็นเส้นประในฟอร์ม)
+ */
+export function thaiDateLongParts(
+  value: string | Date | null | undefined
+): { day: string; month: string; year: string } | null {
+  const parts = isoToThaiParts(value);
+  if (!parts) return null;
+  return { day: String(parts.day), month: THAI_MONTHS[parts.month - 1], year: String(parts.beYear) };
+}
+
 /** จัดรูปแบบวันที่+เวลาเป็น พ.ศ. แบบ DD/MM/YYYY HH:mm (เช่น 24/07/2569 14:30) */
 export function formatThaiDateTime(value: string | Date | null | undefined): string {
   if (!value) return "-";

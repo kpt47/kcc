@@ -1,6 +1,5 @@
-import { documentShell, fill, checkbox, OFFICIAL_FORM_STYLE } from "../layout";
+import { documentShell, fill, checkbox, thaiDateBlank, OFFICIAL_FORM_STYLE } from "../layout";
 import { thaiBahtText } from "@/lib/thai";
-import { formatThaiDate } from "@/lib/formatDate";
 import { VILLAGE_ADDRESS_INCLUDE, villageAddress } from "@/lib/geo";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -16,8 +15,11 @@ export type ProposalPdfOfficials = {
   chairmanName: string | null; // ประธานคณะกรรมการ กข.คจ. หมู่บ้าน — ค้นหาตามพื้นที่จริง
 };
 
-// จัดหน้าให้ตรงกับ "1 แบบเสนอโครงการ กข.คจ..pdf" (แบบแนบท้ายระเบียบกระทรวงมหาดไทยฯ พ.ศ. 2553 หมวด 4 ข้อ 16)
-// อัดให้พอดี A4 หน้าเดียว (ดู OFFICIAL_FORM_STYLE ใน lib/pdf/layout.ts) แทนที่จะล้นไปหน้า 2 เฉพาะย่อหน้าสุดท้าย
+// จัดหน้าให้ตรงกับต้นฉบับ "แบบเสนอโครงการของครัวเรือนเป้าหมาย" (แบบแนบท้ายระเบียบกระทรวงมหาดไทยฯ พ.ศ. 2553
+// หมวด 4 ข้อ 16) ทุกประการ ทั้งถ้อยคำ/ลำดับหัวข้อ/รูปแบบวันที่ (วันที่...เดือน...พ.ศ....) — อัดให้พอดี A4 หน้าเดียว
+// (ดู OFFICIAL_FORM_STYLE ใน lib/pdf/layout.ts) โดยไม่ตัดเนื้อหาใดออกเลย
+// หมายเหตุ: ต้นฉบับใช้ "ผู้เสนอโครงการ" สอดคล้องกันตลอดทั้งฟอร์ม (บางสำเนาของต้นฉบับพิมพ์ผิดเป็น "ผู้ขอยืม" ตรง
+// ช่องลงชื่อ ซึ่งไม่ตรงกับหัวข้อ 1 — แก้ไขให้สอดคล้องกันในเทมเพลตนี้)
 export function renderProposalHtml(proposal: ProposalForPdf, officials: ProposalPdfOfficials): string {
   const h = proposal.household;
   const v = h.village;
@@ -30,14 +32,13 @@ export function renderProposalHtml(proposal: ProposalForPdf, officials: Proposal
         <span>โครงการที่${fill(proposal.proposalNo, { grow: true })}</span>
       </div>
       <div class="center">
-        <p class="doc-title">แบบเสนอโครงการ</p>
-        <p class="doc-title">ของครัวเรือนเป้าหมาย</p>
-        <p class="doc-title">ตามโครงการแก้ไขปัญหาความยากจน (กข.คจ.)</p>
+        <p class="doc-title">แบบเสนอโครงการของครัวเรือนเป้าหมาย</p>
+        <p class="doc-title">ตามโครงการแก้ไขปัญหาความยากจน(กข.คจ.)</p>
       </div>
 
       <p class="form-item">
         1. ผู้เสนอโครงการ นาย/นาง/นางสาว${fill(`${h.headFirstName} ${h.headLastName}`, { wide: true })}
-        อายุ${fill(proposal.applicantAge)}ปี
+        หมายเลขบัตรประจำตัวประชาชน${fill(null, { wide: true })}
       </p>
       <p class="form-line">
         อยู่บ้านเลขที่${fill(h.houseNo)} หมู่ที่${fill(v.villageNo)} บ้าน${fill(v.villageName, { wide: true })}
@@ -48,8 +49,8 @@ export function renderProposalHtml(proposal: ProposalForPdf, officials: Proposal
         อาชีพ${fill(proposal.occupation, { wide: true })}
       </p>
       <p class="form-line">
-        เป็นครัวเรือนเป้าหมาย ลำดับที่${fill(h.sequenceNo)}
-        ในบัญชีจัดลำดับครัวเรือนเป้าหมายโครงการ กข.คจ. ของหมู่บ้าน
+        เป็นครัวเรือนเป้าหมาย ลำดับที่${fill(h.sequenceNo)} ในบัญชีจัดลำดับครัวเรือนเป้าหมายตามโครงการแก้ไขปัญหา
+        ความยากจน (กข.คจ.)ของหมู่บ้าน
       </p>
 
       <p class="form-item">2. เสนอโครงการ${fill(proposal.projectName, { wide: true })}</p>
@@ -71,42 +72,35 @@ export function renderProposalHtml(proposal: ProposalForPdf, officials: Proposal
       <div class="sig-block">
         <p class="sig-line">(ลงชื่อ)${fill("", { wide: true })}ผู้เสนอโครงการ</p>
         <p class="sig-name">(${fill(`${h.headFirstName} ${h.headLastName}`, { wide: true })})</p>
-        <p class="sig-line">วันที่${fill(formatThaiDate(proposal.proposedDate), { wide: true })}</p>
+        <p class="sig-line">${thaiDateBlank(proposal.proposedDate)}</p>
       </div>
 
       <p class="form-item">3. ความเห็นของพัฒนากรผู้รับผิดชอบประจำตำบล</p>
-      <p class="form-line">${checkbox(proposal.workerOpinion === "possible", "เป็นไปได้")}</p>
-      <p class="form-line">
-        ${checkbox(proposal.workerOpinion === "not_possible", "เป็นไปไม่ได้")} (ระบุเหตุผล)${fill(
-    proposal.workerReason,
-    { wide: true }
-  )}
-      </p>
+      <p class="form-line">${checkbox(proposal.workerOpinion === "possible", "เห็นชอบ")}</p>
+      <p class="form-line">${checkbox(proposal.workerOpinion === "not_possible", "ไม่เห็นชอบ")}</p>
       <div class="sig-block">
-        <p class="sig-line">(ลงชื่อ)${fill("", { wide: true })}พัฒนากรผู้รับผิดชอบ</p>
-        <p class="sig-name">(${fill(officials.workerName ?? proposal.workerName, { wide: true })}) ประจำตำบล</p>
-        <p class="sig-line">วันที่${fill(formatThaiDate(proposal.workerDate), { wide: true })}</p>
+        <p class="sig-line">(ลงชื่อ)${fill("", { wide: true })}พัฒนากรผู้รับผิดชอบประจำตำบล</p>
+        <p class="sig-name">(${fill(officials.workerName ?? proposal.workerName, { wide: true })})</p>
+        <p class="sig-line">${thaiDateBlank(proposal.workerDate)}</p>
       </div>
 
-      <p class="form-item">4. ผลการพิจารณาอนุมัติโครงการของคณะกรรมการ กข.คจ. หมู่บ้าน</p>
+      <p class="form-item">4. ผลการพิจารณาอนุมัติเงินยืมของคณะกรรมการกองทุน กข.คจ. ประจำหมู่บ้าน</p>
       <p class="form-line">
-        ${checkbox(proposal.committeeDecision === "approved", "อนุมัติโครงการ")}
-        จำนวนเงิน${fill(proposal.committeeAmount?.toLocaleString("th-TH"), { grow: true })}บาท
+        ${checkbox(proposal.committeeDecision === "approved", "อนุมัติ")}
+        เป็นจำนวนเงิน${fill(proposal.committeeAmount?.toLocaleString("th-TH"), { grow: true })}บาท
         (${fill(thaiBahtText(proposal.committeeAmount), { wide: true })})
       </p>
       <p class="form-line">
-        ${checkbox(proposal.committeeDecision === "rejected", "ไม่อนุมัติ")} เพราะ${fill(
+        ${checkbox(proposal.committeeDecision === "rejected", "ไม่อนุมัติ")}เพราะ${fill(
     proposal.committeeReason,
     { wide: true }
   )}
       </p>
       <div class="sig-block">
-        <p class="sig-line">(ลงชื่อ)${fill("", { wide: true })}ประธานคณะกรรมการ</p>
-        <p class="sig-name">(${fill(officials.chairmanName ?? proposal.committeeChairName, { wide: true })}) กข.คจ.หมู่บ้าน</p>
-        <p class="sig-line">วันที่${fill(formatThaiDate(proposal.committeeDate), { wide: true })}</p>
+        <p class="sig-line">(ลงชื่อ)${fill("", { wide: true })}ประธานคณะกรรมการ กข.คจ.หมู่บ้าน</p>
+        <p class="sig-name">(${fill(officials.chairmanName ?? proposal.committeeChairName, { wide: true })})</p>
+        <p class="sig-line">${thaiDateBlank(proposal.committeeDate)}</p>
       </div>
-
-      <p class="footnote"><u>หมายเหตุ</u> แบบแนบท้ายระเบียบกระทรวงมหาดไทยฯ พ.ศ.2553 หมวด 4 ข้อ 16</p>
     </div>`;
 
   return documentShell(body, { extraStyle: OFFICIAL_FORM_STYLE });

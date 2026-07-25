@@ -5,6 +5,12 @@ import { prisma } from "./prisma";
 import type { CurrentUser } from "./auth";
 import { type VillageScope, scopeWhereDirect } from "./scope";
 import { getEffectiveLoans } from "./effectiveLoans";
+import { VILLAGE_ADDRESS_INCLUDE, villageAddress } from "./geo";
+import type { Prisma } from "@/generated/prisma/client";
+
+type VillageWithAddressAndCount = Prisma.VillageGetPayload<{ include: typeof VILLAGE_ADDRESS_INCLUDE }> & {
+  _count: { households: number };
+};
 
 const THAI_MONTHS_SHORT = [
   "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
@@ -953,6 +959,13 @@ export type VillageDebtorRow = {
 
 export type VillageDebtReportSummary = {
   villageName: string;
+  villageNo: string;
+  villageNameOnly: string;
+  subDistrictName: string;
+  districtName: string;
+  provinceName: string;
+  budgetYear: number;
+  targetHouseholdCount: number;
   debtorCount: number;
   totalLoaned: number;
   bankBalance: number;
@@ -971,7 +984,11 @@ export async function getVillageDebtReport(
 ): Promise<{ rows: VillageDebtorRow[]; summary: VillageDebtReportSummary } | null> {
   const village = await prisma.village.findUnique({
     where: { id: villageId },
-    include: { bankAccounts: { include: { transactions: { orderBy: [{ transactionDate: "desc" }, { id: "desc" }], take: 1 } } } },
+    include: {
+      ...VILLAGE_ADDRESS_INCLUDE,
+      bankAccounts: { include: { transactions: { orderBy: [{ transactionDate: "desc" }, { id: "desc" }], take: 1 } } },
+      _count: { select: { households: true } },
+    },
   });
   if (!village) return null;
   if (budgetYear && village.budgetYear !== budgetYear) return { rows: [], summary: emptyVillageDebtSummary(village) };
@@ -1007,10 +1024,19 @@ export async function getVillageDebtReport(
     0
   );
 
+  const addr = villageAddress(village);
+
   return {
     rows,
     summary: {
       villageName: `หมู่ ${village.villageNo} บ้าน${village.villageName}`,
+      villageNo: village.villageNo,
+      villageNameOnly: village.villageName,
+      subDistrictName: addr.subDistrictName,
+      districtName: addr.districtName,
+      provinceName: addr.provinceName,
+      budgetYear: village.budgetYear,
+      targetHouseholdCount: village._count.households,
       debtorCount: new Set(loans.map((l) => l.household.id)).size,
       totalLoaned: outstandingBalance, // ยอดเงินให้ยืมคงเหลือ (เงินยืมที่ยังไม่ปิดสัญญา)
       bankBalance,
@@ -1021,9 +1047,17 @@ export async function getVillageDebtReport(
   };
 }
 
-function emptyVillageDebtSummary(village: { villageNo: string; villageName: string }): VillageDebtReportSummary {
+function emptyVillageDebtSummary(village: VillageWithAddressAndCount): VillageDebtReportSummary {
+  const addr = villageAddress(village);
   return {
     villageName: `หมู่ ${village.villageNo} บ้าน${village.villageName}`,
+    villageNo: village.villageNo,
+    villageNameOnly: village.villageName,
+    subDistrictName: addr.subDistrictName,
+    districtName: addr.districtName,
+    provinceName: addr.provinceName,
+    budgetYear: village.budgetYear,
+    targetHouseholdCount: village._count.households,
     debtorCount: 0,
     totalLoaned: 0,
     bankBalance: 0,
