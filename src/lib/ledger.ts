@@ -30,9 +30,12 @@ export async function recomputeLoanBalance(loanId: number): Promise<void> {
     .filter((r) => r.status === "APPROVED")
     .reduce((sum, r) => sum + r.amount, 0);
   const outstandingBalance = Math.max(0, loan.amount - totalRepaid);
+  const isClosed = outstandingBalance <= 0;
 
   await prisma.loan.update({
     where: { id: loanId },
-    data: { outstandingBalance, isClosed: outstandingBalance <= 0 },
+    // closedAt: บันทึกวันที่ปิดสัญญาครั้งแรก (เก็บค่าเดิมไว้ถ้าปิดอยู่แล้ว) ล้างกลับเป็น null ถ้ากลับมามียอด
+    // ค้างอีก (เช่น ยกเลิกการอนุมัติรายการรับชำระย้อนหลัง) — ใช้กับกฎรอ 2 เดือนหลังปิดสัญญาก่อนลบทะเบียนครัวเรือนได้
+    data: { outstandingBalance, isClosed, closedAt: isClosed ? (loan.closedAt ?? new Date()) : null },
   });
 }

@@ -105,12 +105,14 @@ export function canEditHousehold(user: Pick<CurrentUser, "role" | "committeeRole
 }
 
 /**
- * บัญชีทะเบียนครัวเรือนเป้าหมาย (เล่มม่วง): ลบทะเบียน — เฉพาะประธานคณะกรรมการหมู่บ้าน (CHAIRMAN) ของหมู่บ้านนั้น
- * เท่านั้น (ตรวจสอบขอบเขตหมู่บ้านแยกที่ scope.ts ตามปกติ) ลบไม่ได้หากครัวเรือนมีประวัติเงินยืม/แบบเสนอโครงการ/
- * แบบขอยืมเงินทุน/บัญชีผู้ใช้งานผูกอยู่แล้ว (ตรวจสอบที่ฝั่ง API ก่อนลบเสมอ เพื่อกันข้อมูลกำพร้า)
+ * บัญชีทะเบียนครัวเรือนเป้าหมาย (เล่มม่วง): ลบทะเบียน — พัฒนาการอำเภอ (DISTRICT_ADMIN), พัฒนากรตำบล
+ * (SUB_DISTRICT_ADMIN) หรือประธานคณะกรรมการหมู่บ้าน (CHAIRMAN) เท่านั้น (ตรวจสอบขอบเขตหมู่บ้านแยกที่ scope.ts
+ * ตามปกติ) ลบไม่ได้ตราบใดที่ครัวเรือนนี้ยังมี "รอบ" แบบเสนอโครงการ/แบบขอยืมเงินทุน/สัญญาเงินยืมที่ยังไม่จบอยู่ หรือ
+ * ปิดสัญญามาไม่ถึง 2 เดือน (ดู getHouseholdDeleteBlockReason(s) ใน lib/loanRoundGate.ts — ตรวจสอบที่ฝั่ง API
+ * ก่อนลบเสมอ เพื่อกันข้อมูลกำพร้า)
  */
 export function canDeleteHousehold(user: Pick<CurrentUser, "role" | "committeeRole">): boolean {
-  return user.committeeRole === "CHAIRMAN";
+  return user.role === "DISTRICT_ADMIN" || user.role === "SUB_DISTRICT_ADMIN" || user.committeeRole === "CHAIRMAN";
 }
 
 /**

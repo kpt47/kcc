@@ -20,6 +20,7 @@ import {
   IT_SUPPORT_DENIED_MESSAGE,
 } from "@/lib/authz";
 import { getAllowedVillageIds, householdSelfScopeWhere } from "@/lib/scope";
+import { getHouseholdDeleteBlockReasons } from "@/lib/loanRoundGate";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,12 @@ export default async function HouseholdsPage() {
       loans: { select: { isClosed: true, riskStatus: true } },
     },
   });
+
+  // ปุ่มลบแสดงเฉพาะครัวเรือนที่ไม่มี "รอบ" ค้างอยู่ และปิดสัญญาเงินยืมล่าสุดมาแล้วอย่างน้อย 2 เดือน (ดู
+  // getHouseholdDeleteBlockReasons ใน lib/loanRoundGate.ts) — ตรวจแบบชุดครั้งเดียวกันปัญหา N+1 query
+  const deleteBlockReasons = canDelete
+    ? await getHouseholdDeleteBlockReasons(households.map((h) => h.id))
+    : new Map();
 
   const villageGroups = new Map<number, { village: (typeof households)[number]["village"]; households: typeof households }>();
   for (const h of households) {
@@ -110,6 +117,7 @@ export default async function HouseholdsPage() {
 
             const listRows: EntityRow[] = groupHouseholds.map((h) => {
               const rating = getHouseholdStarRating(h);
+              const rowCanDelete = canDelete && !deleteBlockReasons.has(h.id);
               const editAction = showActions ? (
                 <EditHouseholdAction
                   household={{
@@ -131,7 +139,7 @@ export default async function HouseholdsPage() {
                     defaultedAmount: h.defaultedAmount,
                   }}
                   canEdit={canEdit}
-                  canDelete={canDelete}
+                  canDelete={rowCanDelete}
                 />
               ) : null;
               return {

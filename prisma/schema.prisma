@@ -462,6 +462,9 @@ model Loan {
   occupation         String? // อาชีพที่ยืมเงินไปลงทุน
   outstandingBalance Float // ยอดค้างชำระคงเหลือ (บาท)
   isClosed           Boolean  @default(false) // ปิดสัญญาแล้ว (คืนครบแล้ว)
+  closedAt           DateTime? // วันที่ปิดสัญญา (ตั้งอัตโนมัติครั้งแรกที่ outstandingBalance <= 0 ใน recomputeLoanBalance,
+  // ล้างกลับเป็น null ถ้ากลับมามียอดค้างอีก) — ใช้กับกฎ "ลบทะเบียนครัวเรือนเป้าหมายได้ก็ต่อเมื่อปิดสัญญามาแล้ว
+  // อย่างน้อย 2 เดือน" (ดู lib/loanRoundGate.ts)
 
   approvalStatus ApprovalStatus @default(PENDING) // อนุมัติโดยประธานคณะกรรมการ (CHAIRMAN)
   approvedById   Int?
