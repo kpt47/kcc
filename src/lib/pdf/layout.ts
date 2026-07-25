@@ -119,6 +119,25 @@ const BASE_STYLE = `
   table.ledger td.name-cell { text-align: left; }
 `;
 
+/**
+ * ปรับความหนาแน่นให้ "แบบเสนอโครงการ"/"แบบขอยืมเงินทุน" พอดีกระดาษ A4 1 หน้า (ของเดิมล้นไปหน้า 2 เฉพาะย่อหน้า
+ * สุดท้าย) — ลด line-height/ระยะขอบ/ระยะห่างย่อหน้าลงเมื่อเทียบกับ BASE_STYLE โดยไม่ตัดเนื้อหาใดออกเลย
+ */
+export const COMPACT_FORM_STYLE = `
+  body { font-size: 15px; line-height: 1.42; }
+  .page { padding: 1.2cm 1.8cm 1cm 2cm; }
+  .doc-header { margin-bottom: 4px; }
+  .doc-header img { height: 36px; }
+  .doc-title { font-size: 16px; margin: 0; }
+  .top-row { margin-bottom: 4px; }
+  p.form-item { margin: 6px 0 2px; }
+  p.form-line { margin: 2px 0 2px 1.5em; }
+  .sig-block { margin-top: 10px; padding-right: 0.5cm; }
+  .sig-block .sig-line { margin: 1px 0; }
+  .sig-block .sig-name { margin: 1px 60px 1px 0; }
+  .footnote { margin-top: 10px; font-size: 12px; }
+`;
+
 export function documentShell(
   bodyHtml: string,
   options?: { extraStyle?: string; pageSize?: string; hideSealHeader?: boolean }

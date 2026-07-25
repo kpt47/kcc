@@ -1,4 +1,4 @@
-import { documentShell, fill, checkbox } from "../layout";
+import { documentShell, fill, checkbox, COMPACT_FORM_STYLE } from "../layout";
 import { thaiBahtText } from "@/lib/thai";
 import { formatThaiDate } from "@/lib/formatDate";
 import { VILLAGE_ADDRESS_INCLUDE, villageAddress } from "@/lib/geo";
@@ -15,12 +15,13 @@ export type LoanRequestPdfOfficials = {
 };
 
 // จัดหน้าให้ตรงกับ "2 แบบขอยืมเงินทุนของครัวเรือนเป้าหมาย.pdf" (แบบแนบท้ายระเบียบกระทรวงมหาดไทยฯ พ.ศ. 2553 หมวด 4 ข้อ 16)
+// อัดให้พอดี A4 หน้าเดียว (ดู COMPACT_FORM_STYLE ใน lib/pdf/layout.ts) แทนที่จะล้นไปหน้า 2 เฉพาะย่อหน้าสุดท้าย
 export function renderLoanRequestHtml(request: LoanRequestForPdf, officials: LoanRequestPdfOfficials): string {
   const h = request.household;
   const v = h.village;
   const addr = villageAddress(v);
 
-  const page1 = `
+  const body = `
     <div class="page">
       <div class="top-row">
         <span>เล่มที่${fill(request.volumeNo, { grow: true })}</span>
@@ -80,11 +81,7 @@ export function renderLoanRequestHtml(request: LoanRequestForPdf, officials: Loa
         <p class="sig-name">(${fill(officials.workerName ?? request.workerName, { wide: true })}) ประจำตำบล</p>
         <p class="sig-line">วันที่${fill(formatThaiDate(request.workerDate), { wide: true })}</p>
       </div>
-    </div>`;
 
-  const page2 = `
-    <div class="page">
-      <p class="page-num">- 2 -</p>
       <p class="form-item">5. ผลการพิจารณาอนุมัติเงินยืมของคณะกรรมการ กข.คจ. หมู่บ้าน</p>
       <p class="form-line">
         ${checkbox(request.committeeDecision === "approved", "อนุมัติเป็นจำนวนเงิน")}
@@ -106,5 +103,5 @@ export function renderLoanRequestHtml(request: LoanRequestForPdf, officials: Loa
       <p class="footnote"><u>หมายเหตุ</u> แบบแนบท้ายระเบียบกระทรวงมหาดไทยฯ พ.ศ.2553 หมวด 4 ข้อ 16</p>
     </div>`;
 
-  return documentShell(page1 + page2);
+  return documentShell(body, { extraStyle: COMPACT_FORM_STYLE });
 }
