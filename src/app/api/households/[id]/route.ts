@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getAllowedVillageIds } from "@/lib/scope";
 import { ACCESS_DENIED_MESSAGE, canEditHousehold, canDeleteHousehold, canViewHouseholdPhoneNumber } from "@/lib/authz";
 import { PHONE_REGEX } from "@/lib/schemas";
+import { hasActiveLoanRound } from "@/lib/loanRoundGate";
 
 // อัปเดตเฉพาะฟิลด์ที่แก้ไขได้หลังลงทะเบียนแล้ว — villageId/sequenceNo กำหนดตัวตนของ record จึงไม่เปิดให้แก้ที่นี่
 const updateHouseholdSchema = z.object({
@@ -65,9 +66,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   return NextResponse.json(updated);
 }
 
-// ลบทะเบียนครัวเรือนเป้าหมาย — เฉพาะประธานคณะกรรมการหมู่บ้าน ป้องกันไม่ให้ลบถ้ายังมีประวัติเงินยืม/แบบเสนอโครงการ/
-// แบบขอยืมเงินทุน/บัญชีผู้ใช้งานผูกอยู่แล้ว (กันข้อมูลกำพร้า) — รายได้เฉลี่ยภายหลังยืมเงิน (HouseholdIncomeRecord)
-// ลบตามไปด้วยอัตโนมัติ (onDelete: Cascade) เพราะเป็นข้อมูลของครัวเรือนนี้เองล้วนๆ ไม่ใช่ประวัติธุรกรรมภายนอก
+// ลบทะเบียนครัวเรือนเป้าหมาย — เฉพาะประธานคณะกรรมการหมู่บ้าน
+//
+// บัญชีผู้ใช้งาน/การยืนยันยอดหนี้ ผูกกับตัวตนครัวเรือนโดยตรง (ไม่เกี่ยวกับรอบเงินยืม) จึงบล็อกไว้เสมอถ้ามีอยู่
+// กันไม่ให้บัญชีผู้ใช้งานกำพร้า/ลบประวัติยืนยันยอดหนี้ทิ้งโดยไม่ตั้งใจ
+//
+// ส่วนแบบเสนอโครงการ/แบบขอยืมเงินทุน/สัญญาเงินยืม: ลบไม่ได้ตราบใดที่ครัวเรือนนี้ยังมี "รอบ" ที่ยังไม่จบอยู่ (ดู
+// lib/loanRoundGate.ts — กฎเดียวกับที่ใช้บล็อกการยื่นแบบเสนอโครงการซ้ำ) เช่น ประธานกรรมการอนุมัติแบบขอยืมเงินทุน
+// แล้วแต่ยังไม่ปิดสัญญา — เมื่อทุกรอบจบแล้ว (ปฏิเสธ หรือปิดสัญญา/ชำระคืนครบ) จึงลบได้จริง โดยลบประวัติแบบเสนอ
+// โครงการ/แบบขอยืมเงินทุน/สัญญาเงินยืม/การรับชำระที่เกี่ยวข้องทั้งหมดของครัวเรือนนี้ไปพร้อมกัน
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: { formErrors: ["กรุณาเข้าสู่ระบบ"] } }, { status: 401 });
@@ -81,9 +88,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 
   const household = await prisma.targetHousehold.findUnique({
     where: { id: householdId },
-    include: {
-      _count: { select: { loans: true, proposals: true, loanRequests: true, users: true, debtConfirmations: true } },
-    },
+    include: { _count: { select: { users: true, debtConfirmations: true } } },
   });
   if (!household) {
     return NextResponse.json({ error: { formErrors: ["ไม่พบครัวเรือนเป้าหมายที่ระบุ"] } }, { status: 404 });
@@ -94,12 +99,9 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     return NextResponse.json({ error: { formErrors: ["ไม่พบครัวเรือนเป้าหมายที่ระบุ"] } }, { status: 404 });
   }
 
-  const { loans, proposals, loanRequests, users, debtConfirmations } = household._count;
-  if (loans + proposals + loanRequests + users + debtConfirmations > 0) {
+  const { users, debtConfirmations } = household._count;
+  if (users + debtConfirmations > 0) {
     const parts: string[] = [];
-    if (loans > 0) parts.push(`เงินยืม ${loans} รายการ`);
-    if (proposals > 0) parts.push(`แบบเสนอโครงการ ${proposals} รายการ`);
-    if (loanRequests > 0) parts.push(`แบบขอยืมเงินทุน ${loanRequests} รายการ`);
     if (users > 0) parts.push(`บัญชีผู้ใช้งาน ${users} บัญชี`);
     if (debtConfirmations > 0) parts.push(`การยืนยันยอดหนี้ ${debtConfirmations} รายการ`);
     return NextResponse.json(
@@ -108,6 +110,26 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     );
   }
 
-  await prisma.targetHousehold.delete({ where: { id: householdId } });
+  if (await hasActiveLoanRound(householdId)) {
+    return NextResponse.json(
+      {
+        error: {
+          formErrors: [
+            "ไม่สามารถลบได้ เนื่องจากครัวเรือนนี้มีแบบเสนอโครงการ/แบบขอยืมเงินทุน/สัญญาเงินยืมที่ยังไม่จบกระบวนการอยู่ (รออนุมัติ หรือได้รับเงินยืมแล้วยังไม่ปิดสัญญา/ชำระคืนไม่ครบ) ต้องรอให้ปิดสัญญาก่อนจึงจะลบได้",
+          ],
+        },
+      },
+      { status: 409 }
+    );
+  }
+
+  const loans = await prisma.loan.findMany({ where: { householdId }, select: { id: true } });
+  await prisma.$transaction([
+    prisma.loanRepayment.deleteMany({ where: { loanId: { in: loans.map((l) => l.id) } } }),
+    prisma.loan.deleteMany({ where: { householdId } }),
+    prisma.loanRequest.deleteMany({ where: { householdId } }),
+    prisma.projectProposal.deleteMany({ where: { householdId } }),
+    prisma.targetHousehold.delete({ where: { id: householdId } }),
+  ]);
   return NextResponse.json({ ok: true });
 }
