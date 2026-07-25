@@ -3,7 +3,8 @@
 // (ไม่ query ตรงจาก page component โดยไม่ผ่าน scope)
 import { prisma } from "./prisma";
 import type { CurrentUser } from "./auth";
-import { type VillageScope, scopeWhereDirect, scopeWhereViaHousehold } from "./scope";
+import { type VillageScope, scopeWhereDirect } from "./scope";
+import { getEffectiveLoans } from "./effectiveLoans";
 
 const THAI_MONTHS_SHORT = [
   "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
@@ -32,10 +33,7 @@ export type HouseholdKpis = {
 export async function getHouseholdKpis(user: CurrentUser): Promise<HouseholdKpis | null> {
   if (!user.householdId) return null;
 
-  const loans = await prisma.loan.findMany({
-    where: { householdId: user.householdId },
-    include: { repayments: true },
-  });
+  const loans = await getEffectiveLoans({ id: user.householdId });
   const activeLoans = loans.filter((l) => !l.isClosed);
   const outstandingBalance = activeLoans.reduce((s, l) => s + l.outstandingBalance, 0);
   const totalRepaid = loans.reduce((s, l) => s + l.repayments.reduce((rs, r) => rs + r.amount, 0), 0);
@@ -102,10 +100,7 @@ export async function getVillageDashboardData(villageId: number): Promise<Villag
   });
   const cashOnHand = latestSnapshot?.fundElsewhere ?? 0;
 
-  const loans = await prisma.loan.findMany({
-    where: { household: { villageId } },
-    include: { household: true, repayments: true },
-  });
+  const loans = await getEffectiveLoans({ villageId: { in: [villageId] } });
   const activeLoans = loans.filter((l) => !l.isClosed);
   const outstandingWithHouseholds = activeLoans.reduce((s, l) => s + l.outstandingBalance, 0);
   const totalDebtors = new Set(activeLoans.map((l) => l.householdId)).size;
@@ -128,7 +123,7 @@ export async function getVillageDashboardData(villageId: number): Promise<Villag
   const overdueLoans = activeLoans
     .filter((l) => l.dueDate && l.dueDate < today)
     .map((l) => ({
-      householdName: `${l.household.headFirstName} ${l.household.headLastName}`,
+      householdName: `${l.headFirstName} ${l.headLastName}`,
       outstandingBalance: l.outstandingBalance,
       dueDate: l.dueDate!.toISOString(),
       daysOverdue: Math.floor((today.getTime() - l.dueDate!.getTime()) / 86_400_000),
@@ -172,14 +167,11 @@ export async function getSubDistrictDashboardData(scope: VillageScope): Promise<
   const villages = await prisma.village.findMany({ where: scopeWhereDirect(scope, "id"), orderBy: { id: "asc" } });
   const villageIds = villages.map((v) => v.id);
 
-  const loans = await prisma.loan.findMany({
-    where: { household: { villageId: { in: villageIds } } },
-    include: { household: { select: { villageId: true } } },
-  });
+  const loans = await getEffectiveLoans({ villageId: { in: villageIds } });
   const today = startOfDay(new Date());
 
   const villageOverview = villages.map((v) => {
-    const vLoans = loans.filter((l) => l.household.villageId === v.id && !l.isClosed);
+    const vLoans = loans.filter((l) => l.villageId === v.id && !l.isClosed);
     const overdue = vLoans.filter((l) => l.dueDate && l.dueDate < today);
     return {
       villageId: v.id,
@@ -222,6 +214,7 @@ export type BigPictureDashboardData = {
   totalVillages: number;
   totalHouseholds: number;
   totalOutstanding: number;
+  totalLoanAmount: number;
   totalFund: number;
   topPerforming: { villageName: string; nplRatio: number; totalOutstanding: number }[];
   topProblem: { villageName: string; nplRatio: number; overdueAmount: number }[];
@@ -235,14 +228,13 @@ export async function getBigPictureDashboardData(scope: VillageScope): Promise<B
   const villageIds = villages.map((v) => v.id);
 
   const totalHouseholds = await prisma.targetHousehold.count({ where: { villageId: { in: villageIds } } });
-  const loans = await prisma.loan.findMany({
-    where: { household: { villageId: { in: villageIds } }, isClosed: false },
-    include: { household: { select: { villageId: true } } },
-  });
+  const allLoans = await getEffectiveLoans({ villageId: { in: villageIds } });
+  const totalLoanAmount = allLoans.reduce((s, l) => s + l.amount, 0);
+  const loans = allLoans.filter((l) => !l.isClosed);
   const today = startOfDay(new Date());
 
   const ranked = villages.map((v) => {
-    const vLoans = loans.filter((l) => l.household.villageId === v.id);
+    const vLoans = loans.filter((l) => l.villageId === v.id);
     const totalOutstanding = vLoans.reduce((s, l) => s + l.outstandingBalance, 0);
     const overdueAmount = vLoans.filter((l) => l.dueDate && l.dueDate < today).reduce((s, l) => s + l.outstandingBalance, 0);
     const bankBalance = v.bankAccounts.reduce((s, a) => s + (a.transactions[0]?.balance ?? 0), 0);
@@ -274,6 +266,7 @@ export async function getBigPictureDashboardData(scope: VillageScope): Promise<B
     totalVillages: villages.length,
     totalHouseholds,
     totalOutstanding,
+    totalLoanAmount,
     totalFund: totalOutstanding + totalBank,
     topPerforming,
     topProblem,
@@ -295,10 +288,7 @@ export type NplStatus = {
 
 /** สถานะ NPL ปัจจุบันโดยรวมในขอบเขตของผู้ใช้ — นับจำนวนเงินยืมแยกตาม riskStatus (คำนวณอัตโนมัติจาก src/lib/risk.ts) */
 export async function getNplStatus(scope: VillageScope): Promise<NplStatus> {
-  const loans = await prisma.loan.findMany({
-    where: { isClosed: false, ...scopeWhereViaHousehold(scope) },
-    select: { outstandingBalance: true, riskStatus: true, dueDate: true },
-  });
+  const loans = (await getEffectiveLoans(scopeWhereDirect(scope, "villageId"))).filter((l) => !l.isClosed);
   const today = startOfDay(new Date());
   const totalOutstanding = loans.reduce((s, l) => s + l.outstandingBalance, 0);
   const totalOverdue = loans
@@ -335,14 +325,11 @@ export async function getNplWatchlist(scope: VillageScope, level: NplWatchlistLe
   });
   const villageIds = villages.map((v) => v.id);
 
-  const loans = await prisma.loan.findMany({
-    where: { isClosed: false, household: { villageId: { in: villageIds } } },
-    include: { household: { select: { villageId: true } } },
-  });
+  const loans = (await getEffectiveLoans({ villageId: { in: villageIds } })).filter((l) => !l.isClosed);
   const today = startOfDay(new Date());
 
   const perVillage = villages.map((v) => {
-    const vLoans = loans.filter((l) => l.household.villageId === v.id);
+    const vLoans = loans.filter((l) => l.villageId === v.id);
     const totalOutstanding = vLoans.reduce((s, l) => s + l.outstandingBalance, 0);
     const overdueAmount = vLoans
       .filter((l) => l.dueDate && l.dueDate < today)
@@ -407,14 +394,11 @@ export async function getVillageFundStatusRows(scope: VillageScope): Promise<Vil
   });
   const villageIds = villages.map((v) => v.id);
 
-  const loans = await prisma.loan.findMany({
-    where: { isClosed: false, household: { villageId: { in: villageIds } } },
-    include: { household: { select: { villageId: true } } },
-  });
+  const loans = (await getEffectiveLoans({ villageId: { in: villageIds } })).filter((l) => !l.isClosed);
 
   const rows = villages.map((v) => {
     const outstandingBalance = loans
-      .filter((l) => l.household.villageId === v.id)
+      .filter((l) => l.villageId === v.id)
       .reduce((s, l) => s + l.outstandingBalance, 0);
     const bankBalance = v.bankAccounts.reduce((s, a) => s + (a.transactions[0]?.balance ?? 0), 0);
     const currentFund = outstandingBalance + bankBalance;

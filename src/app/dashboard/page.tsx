@@ -274,9 +274,20 @@ async function BigPictureView({ user }: { user: CurrentUser }) {
           value={`${data.totalHouseholds.toLocaleString("th-TH")} ครัวเรือน`}
           icon="households"
         />
+        <KpiCard label="ยอดเงินยืมทั้งหมด" value={money(data.totalLoanAmount)} icon="debt" />
         <KpiCard label="ยอดหนี้คงค้างรวม" value={money(data.totalOutstanding)} icon="debt" />
         <KpiCard label="เงินทุนรวมทั้งหมด" value={money(data.totalFund)} icon="fund" />
       </div>
+
+      <PieChartCard
+        title="ยอดเงินยืมทั้งหมด เทียบกับ เงินทุนรวม"
+        subtitle="เปรียบเทียบยอดเงินยืมสะสมทุกสัญญา (รวมแบบขอยืมเงินทุนที่อนุมัติแล้วแต่ยังไม่ได้ทำสัญญา) กับเงินทุนรวมทั้งหมดในขอบเขตของคุณ"
+        filename="total-loan-vs-fund"
+        data={[
+          { name: "ยอดเงินยืมทั้งหมด", value: data.totalLoanAmount },
+          { name: "เงินทุนรวม", value: data.totalFund },
+        ]}
+      />
 
       <div>
         <p className="mb-2 text-sm font-semibold text-slate-600 dark:text-slate-400">

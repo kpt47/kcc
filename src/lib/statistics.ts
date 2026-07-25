@@ -3,7 +3,8 @@
 // (ตามแบบเดียวกับ lib/analytics.ts)
 import { prisma } from "./prisma";
 import type { CurrentUser } from "./auth";
-import { type VillageScope, scopeWhereDirect, scopeWhereViaHousehold } from "./scope";
+import { type VillageScope, scopeWhereDirect } from "./scope";
+import { getEffectiveLoans } from "./effectiveLoans";
 
 // ---------------------------------------------------------------------------
 // 1. จำนวนประชากร + สัดส่วนเพศ (ของหัวหน้าครัวเรือน — ระบบเก็บเพศเฉพาะหัวหน้าครัวเรือนเท่านั้น
@@ -45,10 +46,7 @@ export async function getPopulationStats(scope: VillageScope): Promise<Populatio
 export type RiskContractStats = { normal: number; watchlist: number; highRisk: number; noData: number };
 
 export async function getRiskContractStats(scope: VillageScope): Promise<RiskContractStats> {
-  const loans = await prisma.loan.findMany({
-    where: scopeWhereViaHousehold(scope),
-    select: { isClosed: true, riskStatus: true },
-  });
+  const loans = await getEffectiveLoans(scopeWhereDirect(scope, "villageId"));
   const stats: RiskContractStats = { normal: 0, watchlist: 0, highRisk: 0, noData: 0 };
   for (const l of loans) {
     if (l.isClosed) stats.noData++;
@@ -90,10 +88,7 @@ export async function getBankBalanceStats(scope: VillageScope): Promise<BankBala
 export type LoanAmountStats = { totalAmount: number; outstanding: number; repaid: number };
 
 export async function getLoanAmountStats(scope: VillageScope): Promise<LoanAmountStats> {
-  const loans = await prisma.loan.findMany({
-    where: scopeWhereViaHousehold(scope),
-    select: { amount: true, outstandingBalance: true, isClosed: true },
-  });
+  const loans = await getEffectiveLoans(scopeWhereDirect(scope, "villageId"));
   const totalAmount = loans.reduce((s, l) => s + l.amount, 0);
   const outstanding = loans.filter((l) => !l.isClosed).reduce((s, l) => s + l.outstandingBalance, 0);
   return { totalAmount, outstanding, repaid: Math.max(0, totalAmount - outstanding) };
