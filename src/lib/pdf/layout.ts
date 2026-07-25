@@ -3,11 +3,34 @@
 // วงเล็บช่องทำเครื่องหมาย ( ) แบบฟอร์มกระดาษ, ตารางเส้นตรงสำหรับสมุดบัญชี
 
 import { SEALS_ROW_BASE64 } from "./assets/sealAssets";
+import { SARABUN_REGULAR_TTF_BASE64, SARABUN_SEMIBOLD_TTF_BASE64, SARABUN_BOLD_TTF_BASE64 } from "./assets/sarabunFontAssets";
 import { BRAND_ALT } from "@/lib/branding";
 
-const BASE_STYLE = `
-  @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap');
+// ฝังฟอนต์ Sarabun เป็น base64 ตรงในเอกสารแทนการ @import จาก Google Fonts ผ่านเครือข่าย — Chromium แบบย่อขนาด
+// (@sparticuz/chromium) ที่ใช้เรนเดอร์ PDF บน Vercel serverless ไม่มีฟอนต์ไทยติดตั้งมาให้ และการโหลดฟอนต์จาก
+// อินเทอร์เน็ตขณะสร้าง PDF ก็ไม่น่าเชื่อถือ (มักไม่ทันเวลาในสภาพแวดล้อม serverless) ทำให้ตัวอักษรไทยหายไปทั้งหมด
+const FONT_FACE_STYLE = `
+  @font-face {
+    font-family: "Sarabun";
+    font-weight: 400;
+    font-style: normal;
+    src: url(data:font/ttf;base64,${SARABUN_REGULAR_TTF_BASE64}) format("truetype");
+  }
+  @font-face {
+    font-family: "Sarabun";
+    font-weight: 600;
+    font-style: normal;
+    src: url(data:font/ttf;base64,${SARABUN_SEMIBOLD_TTF_BASE64}) format("truetype");
+  }
+  @font-face {
+    font-family: "Sarabun";
+    font-weight: 700;
+    font-style: normal;
+    src: url(data:font/ttf;base64,${SARABUN_BOLD_TTF_BASE64}) format("truetype");
+  }
+`;
 
+const BASE_STYLE = `
   * { box-sizing: border-box; }
   body {
     font-family: "Sarabun", "TH Sarabun New", sans-serif;
@@ -110,6 +133,7 @@ export function documentShell(
 <meta charset="utf-8" />
 <style>
   @page { size: ${options?.pageSize ?? "A4"}; margin: 0; }
+  ${FONT_FACE_STYLE}
   ${BASE_STYLE}
   ${options?.extraStyle ?? ""}
 </style>
