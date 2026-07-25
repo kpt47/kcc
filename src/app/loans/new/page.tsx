@@ -10,6 +10,7 @@ import { MoneyField } from "@/components/form/MoneyField";
 import { ThaiDateField } from "@/components/form/ThaiDateField";
 import { HouseholdSelect } from "@/components/form/HouseholdSelect";
 import { newLoanSchema, type NewLoanFormValues } from "@/lib/schemas";
+import { computeRepaymentDueDate, computeMonthlyInstallment, monthsBetween } from "@/lib/loanSchedule";
 
 type BankAccountOption = {
   id: number;
@@ -23,7 +24,6 @@ type PendingLoanRequest = {
   loanRequestId: number | null;
   suggestedAmount?: number;
   suggestedOccupation?: string | null;
-  suggestedDueDate?: string | null;
   suggestedBorrowRound: number;
   bankAccounts: BankAccountOption[];
 };
@@ -44,8 +44,21 @@ export default function NewLoanPage() {
 
   const values = watch();
 
+  // ยอดชำระต่อเดือน (โดยประมาณ) คำนวณสดจากวันที่รับเงินยืม/วันครบกำหนดชำระ/จำนวนเงินที่กรอกไว้ — ข้อมูลสัญญา
+  // จริงทั้งหมดนี้เลขานุการเป็นผู้กำหนดตอนทำสัญญา (ย้ายมาจากแบบขอยืมเงินทุนที่ครัวเรือนเคยกรอกเอง)
+  const receivedDateObj = values.receivedDate ? new Date(values.receivedDate) : null;
+  const dueDateObj = values.dueDate ? new Date(values.dueDate) : null;
+  const repaymentPreview =
+    receivedDateObj && dueDateObj && values.amount > 0
+      ? {
+          months: monthsBetween(receivedDateObj, dueDateObj),
+          monthlyInstallment: computeMonthlyInstallment(values.amount, receivedDateObj, dueDateObj),
+        }
+      : null;
+
   // เลือกครัวเรือนแล้ว: ค้นหาแบบขอยืมเงินทุน (ฟอร์ม 2) ที่อนุมัติแล้วและยังไม่ได้ทำสัญญาของครัวเรือนนี้ ถ้ามีให้
-  // เติมจำนวนเงิน/อาชีพ/วันครบกำหนดชำระและผูกสัญญากับแบบขอยืมเงินทุนนั้นอัตโนมัติ พร้อมเสนอลำดับที่ยืมถัดไป
+  // เติมจำนวนเงิน/อาชีพให้อัตโนมัติ พร้อมเสนอลำดับที่ยืมถัดไป (วันครบกำหนดชำระ/วันที่ตกลงชำระในแต่ละเดือน
+  // เลขานุการต้องกรอกเองเสมอ ไม่มีการเติมอัตโนมัติจากแบบขอยืมเงินทุน)
   async function handleSelectHouseholdId(id: number | undefined) {
     setValue("householdId", id as number);
     setValue("loanRequestId", undefined);
@@ -62,7 +75,16 @@ export default function NewLoanPage() {
       setValue("loanRequestId", data.loanRequestId);
       if (data.suggestedAmount != null) setValue("amount", data.suggestedAmount);
       if (data.suggestedOccupation) setValue("occupation", data.suggestedOccupation);
-      if (data.suggestedDueDate) setValue("dueDate", data.suggestedDueDate.slice(0, 10));
+    }
+  }
+
+  // เลือกวันที่รับเงินยืมแล้ว ยังไม่เคยแก้ไขวันครบกำหนดชำระเอง — ตั้งค่าเริ่มต้นให้ตามระยะเวลาผ่อนชำระสูงสุด
+  // ตามระเบียบ (แก้ไขทับเองได้ตามที่ตกลงกับครัวเรือน)
+  function handleReceivedDateChange(v: string | undefined) {
+    setValue("receivedDate", v as string);
+    if (v && !values.dueDate) {
+      const due = computeRepaymentDueDate(new Date(v));
+      setValue("dueDate", due.toISOString().slice(0, 10));
     }
   }
 
@@ -140,11 +162,11 @@ export default function NewLoanPage() {
             name="receivedDate"
             render={({ field }) => (
               <ThaiDateField
-                label="วันที่รับเงินยืม"
+                label="วันที่รับเงินยืม (เริ่มต้นสัญญา)"
                 required
                 error={errors.receivedDate?.message}
                 value={field.value}
-                onChange={field.onChange}
+                onChange={handleReceivedDateChange}
               />
             )}
           />
@@ -152,10 +174,35 @@ export default function NewLoanPage() {
             control={control}
             name="dueDate"
             render={({ field }) => (
-              <ThaiDateField label="วันครบกำหนดชำระ" value={field.value} onChange={field.onChange} />
+              <ThaiDateField
+                label="วันครบกำหนดชำระเงินทั้งหมด (สิ้นสุดสัญญา)"
+                required
+                error={errors.dueDate?.message}
+                value={field.value}
+                onChange={field.onChange}
+              />
             )}
           />
         </div>
+        <TextField
+          label="ตกลงชำระทุกๆวันที่ ..... ของเดือน จนครบสัญญา (ระบุวันที่ 1-31)"
+          required
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={31}
+          error={errors.paymentDayOfMonth?.message}
+          {...register("paymentDayOfMonth", { valueAsNumber: true })}
+        />
+        {repaymentPreview && (
+          <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4">
+            <p className="text-sm font-bold text-emerald-800">ยอดชำระต่อเดือน (โดยประมาณ) — คำนวณอัตโนมัติ</p>
+            <p className="text-2xl font-extrabold text-emerald-900">
+              {repaymentPreview.monthlyInstallment.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท/เดือน
+            </p>
+            <p className="text-xs text-emerald-700">เป็นเวลา {repaymentPreview.months} เดือน นับจากวันที่รับเงินยืม</p>
+          </div>
+        )}
         <TextField label="อาชีพที่นำเงินไปลงทุน" error={errors.occupation?.message} {...register("occupation")} />
 
         {pending && pending.bankAccounts.length > 1 && (

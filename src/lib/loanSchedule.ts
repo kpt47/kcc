@@ -1,10 +1,10 @@
-// คำนวณวันครบกำหนดชำระเงินทั้งหมดและยอดผ่อนชำระต่อเดือนของแบบขอยืมเงินทุน — ใช้ทั้งตอนสร้าง/แก้ไขคำร้อง
-// (เก็บผลลง LoanRequest.repaymentDueDate) และตอนแสดงตัวอย่างให้ครัวเรือนดูก่อนยื่นคำร้อง/ในหน้าหลัก
+// คำนวณวันครบกำหนดชำระเงินทั้งหมดและยอดผ่อนชำระต่อเดือนของสัญญาเงินยืม — ใช้ตอนเลขานุการบันทึกสัญญาเงินยืมใหม่
+// (Loan.dueDate/paymentDayOfMonth) เพื่อเสนอค่าเริ่มต้นและแสดงตัวอย่างยอดผ่อนชำระต่อเดือน
 import { MAX_REPAYMENT_YEARS } from "./config";
 
-/** วันครบกำหนดชำระเงินทั้งหมด = วันที่ยื่นคำขอ + ระยะเวลาผ่อนชำระสูงสุดตามระเบียบ (ปัจจุบัน 3 ปี) */
-export function computeRepaymentDueDate(requestDate: Date): Date {
-  const due = new Date(requestDate);
+/** วันครบกำหนดชำระเงินทั้งหมด = วันที่รับเงินยืม + ระยะเวลาผ่อนชำระสูงสุดตามระเบียบ (ปัจจุบัน 3 ปี) */
+export function computeRepaymentDueDate(receivedDate: Date): Date {
+  const due = new Date(receivedDate);
   due.setFullYear(due.getFullYear() + MAX_REPAYMENT_YEARS);
   return due;
 }

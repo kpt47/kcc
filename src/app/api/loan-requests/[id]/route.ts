@@ -54,8 +54,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       requestedAmount: data.requestedAmount,
       spouseConsentName: data.spouseConsentName,
       requestDate: data.requestDate ? new Date(data.requestDate) : undefined,
-      paymentDayOfMonth: data.paymentDayOfMonth,
-      repaymentDueDate: data.repaymentDueDate ? new Date(data.repaymentDueDate) : undefined,
     },
   });
 

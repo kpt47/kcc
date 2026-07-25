@@ -15,9 +15,8 @@ import { HouseholdSelect, type HouseholdOption } from "@/components/form/Househo
 import { loanRequestSchema, LOAN_REQUEST_STEP_FIELDS, type LoanRequestFormValues, type LoanRequestSubmitValues } from "@/lib/schemas";
 import { thaiBahtText, calculateAge } from "@/lib/thai";
 import { formatThaiDate } from "@/lib/formatDate";
-import { LOAN_CEILING_DEFAULT, MAX_REPAYMENT_YEARS } from "@/lib/config";
+import { LOAN_CEILING_DEFAULT } from "@/lib/config";
 import { alertDialog, confirmDialog } from "@/lib/confirmDialog";
-import { computeRepaymentDueDate, computeMonthlyInstallment, monthsBetween } from "@/lib/loanSchedule";
 
 const STEPS = [
   { title: "ข้อมูลผู้ขอยืม" },
@@ -60,9 +59,6 @@ function NewLoanRequestForm() {
   // true จนกว่าจะรู้แน่ชัดว่ามีแบบเสนอโครงการที่อนุมัติแล้วมาอ้างอิงหรือไม่ — กันไม่ให้กรอกยอดขอยืมได้ก่อนรู้ผล
   // (ไม่งั้นจะมีช่วงเวลาสั้นๆ ที่พิมพ์ยอดเกินวงเงินจริงได้ก่อนที่ระบบจะโหลดข้อมูลวงเงินที่อนุมัติมาจำกัดทัน)
   const [checkingProposalLink, setCheckingProposalLink] = useState(true);
-  // วันครบกำหนดชำระเงินทั้งหมด: ค่าเริ่มต้นตามวันที่ยื่นคำขอ (+MAX_REPAYMENT_YEARS) แต่ครัวเรือนแก้ไขเองได้ —
-  // เมื่อแก้เองแล้วครั้งหนึ่ง จะไม่ auto-update ตามวันที่ยื่นคำขอที่เปลี่ยนภายหลังอีก (เคารพค่าที่เลือกเอง)
-  const [dueDateTouched, setDueDateTouched] = useState(false);
 
   const {
     register,
@@ -84,18 +80,6 @@ function NewLoanRequestForm() {
     linkedProposal?.committeeAmount != null
       ? Math.min(LOAN_CEILING_DEFAULT, linkedProposal.committeeAmount)
       : LOAN_CEILING_DEFAULT;
-
-  // ยอดชำระต่อเดือน (โดยประมาณ) เป็นค่าคำนวณอัตโนมัติเสมอ — มาจากวันที่ยื่นคำขอ, วันครบกำหนดชำระที่ครัวเรือน
-  // กรอกเอง (หรือค่าเริ่มต้นที่ยังไม่ได้แก้ไข) และจำนวนเงินที่ขอยืม ไม่ให้แก้ไขค่านี้ตรงๆ
-  const requestDateObj = values.requestDate ? new Date(values.requestDate) : null;
-  const dueDateObj = values.repaymentDueDate ? new Date(values.repaymentDueDate) : null;
-  const repaymentPreview =
-    requestDateObj && dueDateObj && values.requestedAmount > 0
-      ? {
-          months: monthsBetween(requestDateObj, dueDateObj),
-          monthlyInstallment: computeMonthlyInstallment(values.requestedAmount, requestDateObj, dueDateObj),
-        }
-      : null;
 
   // ตรวจสอบยอดขอยืมเทียบกับวงเงินที่ประธานกรรมการอนุมัติไว้ในแบบเสนอโครงการที่อ้างอิง — เรียกทั้งตอนออกจากช่อง
   // จำนวนเงิน (onBlur) และตอนกดถัดไป เพื่อให้เตือนทันทีไม่ต้องรอเปลี่ยนหน้าก่อน
@@ -358,61 +342,9 @@ function NewLoanRequestForm() {
               control={control}
               name="requestDate"
               render={({ field }) => (
-                <ThaiDateField
-                  label="วันที่ยื่นคำขอ"
-                  required
-                  value={field.value}
-                  onChange={(v) => {
-                    field.onChange(v);
-                    // ยังไม่เคยแก้ไขวันครบกำหนดชำระเอง — ตั้งค่าเริ่มต้นให้ตามวันที่ยื่นคำขอใหม่นี้อัตโนมัติ
-                    if (!dueDateTouched && v) {
-                      const due = computeRepaymentDueDate(new Date(v));
-                      setValue("repaymentDueDate", due.toISOString().slice(0, 10));
-                    }
-                  }}
-                />
+                <ThaiDateField label="วันที่ยื่นคำขอ" required value={field.value} onChange={field.onChange} />
               )}
             />
-
-            <TextField
-              label="1. ตกลงชำระทุกๆวันที่ ..... ของเดือน จนครบสัญญา (ระบุวันที่ 1-31)"
-              required
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={31}
-              error={errors.paymentDayOfMonth?.message}
-              {...register("paymentDayOfMonth", { valueAsNumber: true })}
-            />
-
-            <Controller
-              control={control}
-              name="repaymentDueDate"
-              render={({ field }) => (
-                <ThaiDateField
-                  label="2. วันครบกำหนดชำระเงินทั้งหมด"
-                  required
-                  hint={`ค่าเริ่มต้น: วันที่ยื่นคำขอ + ${MAX_REPAYMENT_YEARS} ปี — แก้ไขเองได้ตามที่ตกลงกับคณะกรรมการ`}
-                  error={errors.repaymentDueDate?.message}
-                  toBeYearOffset={MAX_REPAYMENT_YEARS + 1}
-                  value={field.value}
-                  onChange={(v) => {
-                    field.onChange(v);
-                    setDueDateTouched(true);
-                  }}
-                />
-              )}
-            />
-
-            {repaymentPreview && (
-              <div className="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4">
-                <p className="text-sm font-bold text-emerald-800">3. ยอดชำระต่อเดือน (โดยประมาณ) — คำนวณอัตโนมัติ</p>
-                <p className="text-2xl font-extrabold text-emerald-900">
-                  {repaymentPreview.monthlyInstallment.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท/เดือน
-                </p>
-                <p className="text-xs text-emerald-700">เป็นเวลา {repaymentPreview.months} เดือน นับจากวันที่ยื่นคำขอ</p>
-              </div>
-            )}
           </div>
         )}
 
@@ -442,21 +374,11 @@ function NewLoanRequestForm() {
                 />
                 <ReviewRow label="ผู้ให้คำยินยอม" value={values.spouseConsentName} />
                 <ReviewRow label="วันที่ยื่นคำขอ" value={formatThaiDate(values.requestDate)} />
-                <ReviewRow
-                  label="ตกลงชำระทุกๆวันที่"
-                  value={values.paymentDayOfMonth ? `วันที่ ${values.paymentDayOfMonth} ของทุกเดือน` : undefined}
-                />
-                <ReviewRow label="วันครบกำหนดชำระเงินทั้งหมด" value={formatThaiDate(values.repaymentDueDate)} />
-                {repaymentPreview && (
-                  <ReviewRow
-                    label="ยอดชำระต่อเดือน (โดยประมาณ)"
-                    value={`${repaymentPreview.monthlyInstallment.toLocaleString("th-TH", { maximumFractionDigits: 0 })} บาท (${repaymentPreview.months} เดือน)`}
-                  />
-                )}
               </dl>
             </section>
             <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700">
               หลังบันทึกแล้ว พัฒนากรจะเป็นผู้ให้ความเห็น และประธานคณะกรรมการหมู่บ้านจะเป็นผู้พิจารณาอนุมัติในภายหลัง
+              (วันครบกำหนดชำระเงินทั้งหมดและวันที่ตกลงชำระในแต่ละเดือน เลขานุการจะเป็นผู้กำหนดตอนทำสัญญาเงินยืมจริง)
             </p>
             {submitError && (
               <p className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-sm font-medium text-rose-700">

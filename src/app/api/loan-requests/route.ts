@@ -106,10 +106,6 @@ export async function POST(request: Request) {
     agreesToRegulations: data.agreesToRegulations,
     spouseConsentName: data.spouseConsentName,
     requestDate: new Date(data.requestDate),
-    paymentDayOfMonth: data.paymentDayOfMonth,
-    // ครัวเรือนกรอกเอง (ตรวจขอบเขตแล้วที่ loanRequestSchema: ต้องอยู่หลังวันที่ยื่นคำขอ และไม่เกิน
-    // MAX_REPAYMENT_YEARS ปีนับจากวันนั้น)
-    repaymentDueDate: new Date(data.repaymentDueDate),
   };
   let loanRequest;
   try {

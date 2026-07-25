@@ -548,16 +548,6 @@ export const loanRequestSchema = z
     }),
     spouseConsentName: z.string().optional(),
     requestDate: requiredIsoDate,
-    // ตกลงชำระทุกๆวันที่ .... ของเดือน จนครบสัญญา — ใช้แสดงคู่กับวันครบกำหนดชำระเงินทั้งหมด/ยอดผ่อนชำระต่อเดือน
-    // (ดู lib/loanSchedule.ts) ให้ครัวเรือนเห็นก่อนยื่นคำร้อง และในหน้าหลักหลังยื่นแล้ว
-    paymentDayOfMonth: z
-      .number({ error: "กรุณาระบุวันที่ชำระในแต่ละเดือน" })
-      .int("ระบุวันที่เป็นจำนวนเต็ม")
-      .min(1, "ระบุวันที่ 1-31")
-      .max(31, "ระบุวันที่ 1-31"),
-    // วันครบกำหนดชำระเงินทั้งหมด — ครัวเรือนกรอกเองได้ (ค่าเริ่มต้นคำนวณจากวันที่ยื่นคำขอ + ระยะเวลาผ่อนชำระ
-    // สูงสุดตามระเบียบที่หน้าฟอร์ม) ต้องอยู่หลังวันที่ยื่นคำขอ และไม่เกิน MAX_REPAYMENT_YEARS ปีนับจากวันนั้น
-    repaymentDueDate: requiredIsoDate,
 
     // ขั้นตอนที่ 3: ความเห็นเจ้าหน้าที่ (ไม่บังคับ - กรอกภายหลังได้)
     workerOpinion: z.enum(["agree", "disagree"]).optional(),
@@ -577,22 +567,7 @@ export const loanRequestSchema = z
   .refine((data) => data.committeeDecision !== "rejected" || !!data.committeeReason?.trim(), {
     message: "กรุณาระบุเหตุผลที่ไม่อนุมัติ",
     path: ["committeeReason"],
-  })
-  .refine((data) => new Date(data.repaymentDueDate) > new Date(data.requestDate), {
-    message: "วันครบกำหนดชำระเงินทั้งหมดต้องอยู่หลังวันที่ยื่นคำขอ",
-    path: ["repaymentDueDate"],
-  })
-  .refine(
-    (data) => {
-      const maxDue = new Date(data.requestDate);
-      maxDue.setFullYear(maxDue.getFullYear() + MAX_REPAYMENT_YEARS);
-      return new Date(data.repaymentDueDate) <= maxDue;
-    },
-    {
-      message: `วันครบกำหนดชำระเงินทั้งหมดต้องไม่เกิน ${MAX_REPAYMENT_YEARS} ปีนับจากวันที่ยื่นคำขอ`,
-      path: ["repaymentDueDate"],
-    }
-  );
+  });
 
 /** ครัวเรือนแก้ไขแบบขอยืมเงินทุนของตนเอง — เฉพาะตอนยังไม่มีความเห็นพัฒนากร (ดู PATCH /api/loan-requests/[id]) */
 export const loanRequestSelfEditSchema = z.object({
@@ -603,8 +578,6 @@ export const loanRequestSelfEditSchema = z.object({
   ),
   spouseConsentName: z.string().optional(),
   requestDate: z.string().optional(),
-  paymentDayOfMonth: z.number().int("ระบุวันที่เป็นจำนวนเต็ม").min(1, "ระบุวันที่ 1-31").max(31, "ระบุวันที่ 1-31").optional(),
-  repaymentDueDate: z.string().optional(),
 });
 export type LoanRequestSelfEditValues = z.infer<typeof loanRequestSelfEditSchema>;
 
@@ -617,8 +590,6 @@ export interface LoanRequestFormValues {
   agreesToRegulations: boolean;
   spouseConsentName?: string;
   requestDate: string;
-  paymentDayOfMonth: number;
-  repaymentDueDate: string;
   workerOpinion?: "agree" | "disagree";
   workerReason?: string;
   workerName?: string;
@@ -640,8 +611,6 @@ export interface LoanRequestSubmitValues {
   agreesToRegulations: boolean;
   spouseConsentName?: string;
   requestDate: string;
-  paymentDayOfMonth: number;
-  repaymentDueDate: string;
   workerOpinion?: "agree" | "disagree";
   workerReason?: string;
   workerName?: string;
@@ -655,29 +624,53 @@ export interface LoanRequestSubmitValues {
 
 export const LOAN_REQUEST_STEP_FIELDS = [
   ["householdId", "applicantAge", "occupation"],
-  ["requestedAmount", "agreesToRegulations", "spouseConsentName", "requestDate", "paymentDayOfMonth", "repaymentDueDate"],
+  ["requestedAmount", "agreesToRegulations", "spouseConsentName", "requestDate"],
 ] as const;
 
 // ---------------------------------------------------------------------------
 // บันทึกรายการยืมเงินใหม่ (เล่มเหลือง) — เลขานุการ
 // ---------------------------------------------------------------------------
-export const newLoanSchema = z.object({
-  householdId: z.number({ error: "กรุณาเลือกครัวเรือนเป้าหมาย" }).int().positive("กรุณาเลือกครัวเรือนเป้าหมาย"),
-  loanRequestId: z.number().int().positive().optional(),
-  bankAccountId: z.number().int().positive().optional(),
-  borrowRound: z
-    .number({ error: "กรุณากรอกลำดับที่ยืม" })
-    .int("ลำดับที่ยืมต้องเป็นจำนวนเต็ม")
-    .positive("ลำดับที่ยืมต้องมากกว่า 0"),
-  contractNo: z.string().optional(),
-  amount: z
-    .number({ error: "กรุณากรอกจำนวนเงินยืม" })
-    .positive("จำนวนเงินต้องมากกว่า 0")
-    .max(LOAN_CEILING_DEFAULT, `จำนวนเงินต้องไม่เกินเพดาน ${LOAN_CEILING_DEFAULT.toLocaleString("th-TH")} บาท`),
-  receivedDate: requiredIsoDate,
-  dueDate: optionalIsoDate,
-  occupation: z.string().optional(),
-});
+export const newLoanSchema = z
+  .object({
+    householdId: z.number({ error: "กรุณาเลือกครัวเรือนเป้าหมาย" }).int().positive("กรุณาเลือกครัวเรือนเป้าหมาย"),
+    loanRequestId: z.number().int().positive().optional(),
+    bankAccountId: z.number().int().positive().optional(),
+    borrowRound: z
+      .number({ error: "กรุณากรอกลำดับที่ยืม" })
+      .int("ลำดับที่ยืมต้องเป็นจำนวนเต็ม")
+      .positive("ลำดับที่ยืมต้องมากกว่า 0"),
+    contractNo: z.string().optional(),
+    amount: z
+      .number({ error: "กรุณากรอกจำนวนเงินยืม" })
+      .positive("จำนวนเงินต้องมากกว่า 0")
+      .max(LOAN_CEILING_DEFAULT, `จำนวนเงินต้องไม่เกินเพดาน ${LOAN_CEILING_DEFAULT.toLocaleString("th-TH")} บาท`),
+    receivedDate: requiredIsoDate,
+    // วันครบกำหนดชำระเงินทั้งหมด (สิ้นสุดสัญญา) และวันที่ตกลงชำระในแต่ละเดือน — ข้อมูลสัญญาจริงที่เลขานุการ
+    // เป็นผู้กำหนดตอนทำสัญญาเงินยืมเท่านั้น (ย้ายมาจากแบบขอยืมเงินทุนที่ครัวเรือนเคยกรอกเอง เพราะยังไม่ใช่ข้อมูล
+    // สัญญาที่แท้จริงในขั้นตอนนั้น) ใช้คำนวณยอดผ่อนชำระต่อเดือนและประเมินความเสี่ยง/NPL ล่วงหน้า
+    dueDate: requiredIsoDate,
+    paymentDayOfMonth: z
+      .number({ error: "กรุณาระบุวันที่ชำระในแต่ละเดือน" })
+      .int("ระบุวันที่เป็นจำนวนเต็ม")
+      .min(1, "ระบุวันที่ 1-31")
+      .max(31, "ระบุวันที่ 1-31"),
+    occupation: z.string().optional(),
+  })
+  .refine((data) => new Date(data.dueDate) > new Date(data.receivedDate), {
+    message: "วันครบกำหนดชำระเงินทั้งหมดต้องอยู่หลังวันที่รับเงินยืม",
+    path: ["dueDate"],
+  })
+  .refine(
+    (data) => {
+      const maxDue = new Date(data.receivedDate);
+      maxDue.setFullYear(maxDue.getFullYear() + MAX_REPAYMENT_YEARS);
+      return new Date(data.dueDate) <= maxDue;
+    },
+    {
+      message: `วันครบกำหนดชำระเงินทั้งหมดต้องไม่เกิน ${MAX_REPAYMENT_YEARS} ปีนับจากวันที่รับเงินยืม`,
+      path: ["dueDate"],
+    }
+  );
 export type NewLoanFormValues = z.infer<typeof newLoanSchema>;
 
 // ---------------------------------------------------------------------------

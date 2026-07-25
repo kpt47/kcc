@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   const [loanRequest, loanCount, bankAccountRows] = await Promise.all([
     prisma.loanRequest.findFirst({
       where: { householdId, committeeDecision: "approved", loan: null },
-      select: { id: true, requestedAmount: true, occupation: true, repaymentDueDate: true },
+      select: { id: true, requestedAmount: true, occupation: true },
       orderBy: { createdAt: "desc" },
     }),
     prisma.loan.count({ where: { householdId } }),
@@ -63,7 +63,6 @@ export async function GET(request: Request) {
     loanRequestId: loanRequest.id,
     suggestedAmount: loanRequest.requestedAmount,
     suggestedOccupation: loanRequest.occupation,
-    suggestedDueDate: loanRequest.repaymentDueDate,
     suggestedBorrowRound: loanCount + 1,
     bankAccounts,
   });

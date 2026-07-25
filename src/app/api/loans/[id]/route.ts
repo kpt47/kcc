@@ -10,6 +10,7 @@ const updateLoanSchema = z.object({
   amount: z.number().positive().optional(),
   receivedDate: z.string().min(1).optional(),
   dueDate: z.string().optional(),
+  paymentDayOfMonth: z.number().int().min(1).max(31).optional(),
   occupation: z.string().optional(),
   outstandingBalance: z.number().min(0).optional(),
   isClosed: z.boolean().optional(),

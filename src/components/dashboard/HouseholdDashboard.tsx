@@ -50,22 +50,23 @@ export async function HouseholdDashboard({ user }: { user: CurrentUser }) {
     );
   }
 
-  // ข้อตกลงการผ่อนชำระของแบบขอยืมเงินทุนล่าสุด — แสดงให้ครัวเรือนเห็นชัดเจนตั้งแต่หน้าหลัก เพื่อความเข้าใจ
-  // ที่ตรงกันทุกฝ่ายตั้งแต่วันที่ยื่นคำขอ ไม่ต้องรอผลอนุมัติก่อนถึงจะเห็น (เป็นข้อตกลงที่ครัวเรือนกรอกเอง)
-  const latestLoanRequest = await prisma.loanRequest.findFirst({
-    where: { householdId: household.id, paymentDayOfMonth: { not: null }, repaymentDueDate: { not: null } },
-    orderBy: { createdAt: "desc" },
-    select: { requestedAmount: true, requestDate: true, paymentDayOfMonth: true, repaymentDueDate: true },
+  // ข้อตกลงการผ่อนชำระของสัญญาเงินยืมล่าสุด — วันครบกำหนดชำระ/วันที่ตกลงชำระในแต่ละเดือน เป็นข้อมูลที่เลขานุการ
+  // เป็นผู้กำหนดตอนทำสัญญาเงินยืมจริงเท่านั้น (ไม่ใช่ข้อมูลที่ครัวเรือนกรอกเองตอนยื่นแบบขอยืมเงินทุนอีกต่อไป)
+  // จึงแสดงได้ก็ต่อเมื่อมีสัญญาเงินยืมจริงแล้วเท่านั้น
+  const latestActiveLoan = await prisma.loan.findFirst({
+    where: { householdId: household.id, isClosed: false, dueDate: { not: null }, paymentDayOfMonth: { not: null } },
+    orderBy: { receivedDate: "desc" },
+    select: { amount: true, receivedDate: true, dueDate: true, paymentDayOfMonth: true },
   });
   const repaymentSchedule =
-    latestLoanRequest?.repaymentDueDate
+    latestActiveLoan?.dueDate && latestActiveLoan.paymentDayOfMonth
       ? {
-          paymentDayOfMonth: latestLoanRequest.paymentDayOfMonth!,
-          dueDate: latestLoanRequest.repaymentDueDate,
+          paymentDayOfMonth: latestActiveLoan.paymentDayOfMonth,
+          dueDate: latestActiveLoan.dueDate,
           monthlyInstallment: computeMonthlyInstallment(
-            latestLoanRequest.requestedAmount,
-            latestLoanRequest.requestDate,
-            latestLoanRequest.repaymentDueDate
+            latestActiveLoan.amount,
+            latestActiveLoan.receivedDate,
+            latestActiveLoan.dueDate
           ),
         }
       : null;
@@ -113,7 +114,7 @@ export async function HouseholdDashboard({ user }: { user: CurrentUser }) {
           <div className="flex items-center gap-2">
             <CalendarClock className="h-6 w-6 shrink-0 text-sky-700 dark:text-sky-300" aria-hidden />
             <p className="text-base font-bold text-sky-900 dark:text-sky-200">
-              ข้อตกลงการผ่อนชำระเงินยืม (ตามแบบขอยืมเงินทุนล่าสุด)
+              ข้อตกลงการผ่อนชำระเงินยืม (ตามสัญญาเงินยืมล่าสุด)
             </p>
           </div>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
