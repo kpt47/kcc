@@ -67,7 +67,7 @@ export default async function DebtHistoryPage() {
     );
   }
 
-  const [loans, activeRound, villageBankAccounts] = await Promise.all([
+  const [loans, activeRound, villageBankAccounts, pendingLoanRequest] = await Promise.all([
     prisma.loan.findMany({
       where: { householdId: household.id },
       orderBy: [{ isClosed: "asc" }, { receivedDate: "desc" }],
@@ -79,6 +79,14 @@ export default async function DebtHistoryPage() {
       include: { confirmations: { where: { householdId: household.id } } },
     }),
     prisma.bankAccount.findMany({ where: { villageId: household.villageId } }),
+    // แบบขอยืมเงินทุนที่อนุมัติแล้ว แต่เลขานุการยังไม่ได้ทำสัญญาเงินยืม (Loan) จริงให้ — ยังไม่นับเป็น "หนี้"
+    // ในหน้านี้ (ยังรายงานชำระเงิน/พิมพ์ใบเสร็จไม่ได้เพราะไม่มีสัญญาให้ผูก) แต่ต้องแจ้งสถานะให้ครัวเรือนทราบ
+    // ไม่งั้นจะดูเหมือนหน้านี้ไม่มีข้อมูลอะไรเลย ทั้งที่หน้าหลักเพิ่งแสดงข้อตกลงการผ่อนชำระไปหมาดๆ
+    prisma.loanRequest.findFirst({
+      where: { householdId: household.id, committeeDecision: "approved", loan: null },
+      orderBy: { createdAt: "desc" },
+      select: { requestedAmount: true, committeeAmount: true },
+    }),
   ]);
   const showDebtConfirmation = activeRound != null && activeRound.confirmations.length === 0;
 
@@ -159,9 +167,19 @@ export default async function DebtHistoryPage() {
         </div>
 
         {loans.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
-            ยังไม่มีข้อมูลเงินยืมของครัวเรือนคุณในระบบ
-          </p>
+          pendingLoanRequest ? (
+            <div className="rounded-2xl border-2 border-sky-300 bg-sky-50 p-5 text-center text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
+              <p className="font-semibold">
+                แบบขอยืมเงินทุนของคุณได้รับการอนุมัติแล้ว จำนวน{" "}
+                {(pendingLoanRequest.committeeAmount ?? pendingLoanRequest.requestedAmount).toLocaleString("th-TH")} บาท
+              </p>
+              <p className="mt-1">กำลังรอเลขานุการดำเนินการทำสัญญาเงินยืม ยอดหนี้จะปรากฏที่นี่หลังทำสัญญาเสร็จสิ้น</p>
+            </div>
+          ) : (
+            <p className="rounded-2xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              ยังไม่มีข้อมูลเงินยืมของครัวเรือนคุณในระบบ
+            </p>
+          )
         ) : (
           <>
             <div className={`rounded-2xl border ${yellow.cardBorder} ${yellow.cardBg} p-4`}>

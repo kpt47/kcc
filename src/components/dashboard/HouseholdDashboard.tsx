@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { THEMES } from "@/lib/theme";
 import { formatThaiDate } from "@/lib/thai";
 import { computeMonthlyInstallment } from "@/lib/loanSchedule";
+import { getEffectiveLoans } from "@/lib/effectiveLoans";
 import type { CurrentUser } from "@/lib/auth";
 
 const RISK_RANK: Record<string, number> = { NORMAL: 0, WATCHLIST: 1, HIGH_RISK: 2 };
@@ -69,7 +70,9 @@ export async function HouseholdDashboard({ user }: { user: CurrentUser }) {
         }
       : null;
 
-  const loans = await prisma.loan.findMany({ where: { householdId: household.id } });
+  // รวมสัญญาเงินยืมจริงกับแบบขอยืมเงินทุนที่อนุมัติแล้วแต่ยังไม่ทำสัญญา (ดู lib/effectiveLoans.ts) เพื่อไม่ให้
+  // ยอดค้างชำระ/สถานะความเสี่ยงตรงนี้ขัดแย้งกับการ์ด "ข้อตกลงการผ่อนชำระเงินยืม" ด้านบนที่แสดงตั้งแต่ยื่นคำขอ
+  const loans = await getEffectiveLoans({ id: household.id });
   const outstandingTotal = loans.filter((l) => !l.isClosed).reduce((sum, l) => sum + l.outstandingBalance, 0);
   const activeLoanCount = loans.filter((l) => !l.isClosed).length;
 
