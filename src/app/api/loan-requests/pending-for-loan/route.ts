@@ -31,17 +31,32 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: { formErrors: [ACCESS_DENIED_MESSAGE] } }, { status: 403 });
   }
 
-  const [loanRequest, loanCount] = await Promise.all([
+  const [loanRequest, loanCount, bankAccountRows] = await Promise.all([
     prisma.loanRequest.findFirst({
       where: { householdId, committeeDecision: "approved", loan: null },
       select: { id: true, requestedAmount: true, occupation: true, repaymentDueDate: true },
       orderBy: { createdAt: "desc" },
     }),
     prisma.loan.count({ where: { householdId } }),
+    // บัญชีธนาคารของหมู่บ้านนี้ — ให้เลขานุการเลือกว่าจะถอนเงินจ่ายครัวเรือนจากบัญชีใด (ดู POST /api/loans
+    // ที่จะบันทึกรายการถอนคู่กับสัญญาเงินยืมให้อัตโนมัติ กันยอด "เงินทุนรวม" ซ้อนทับ — เงินเดียวกันถูกนับทั้งเป็น
+    // เงินฝากธนาคารและยอดเงินยืมพร้อมกัน)
+    prisma.bankAccount.findMany({
+      where: { villageId: household.villageId },
+      include: { transactions: { orderBy: [{ transactionDate: "desc" }, { id: "desc" }], take: 1 } },
+    }),
   ]);
 
+  const bankAccounts = bankAccountRows.map((a) => ({
+    id: a.id,
+    bankName: a.bankName,
+    branch: a.branch,
+    accountNo: a.accountNo,
+    balance: a.transactions[0]?.balance ?? 0,
+  }));
+
   if (!loanRequest) {
-    return NextResponse.json({ loanRequestId: null, suggestedBorrowRound: loanCount + 1 });
+    return NextResponse.json({ loanRequestId: null, suggestedBorrowRound: loanCount + 1, bankAccounts });
   }
 
   return NextResponse.json({
@@ -50,5 +65,6 @@ export async function GET(request: Request) {
     suggestedOccupation: loanRequest.occupation,
     suggestedDueDate: loanRequest.repaymentDueDate,
     suggestedBorrowRound: loanCount + 1,
+    bankAccounts,
   });
 }
