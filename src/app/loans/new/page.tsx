@@ -11,19 +11,49 @@ import { ThaiDateField } from "@/components/form/ThaiDateField";
 import { HouseholdSelect } from "@/components/form/HouseholdSelect";
 import { newLoanSchema, type NewLoanFormValues } from "@/lib/schemas";
 
+type PendingLoanRequest = {
+  loanRequestId: number | null;
+  suggestedAmount?: number;
+  suggestedOccupation?: string | null;
+  suggestedDueDate?: string | null;
+  suggestedBorrowRound: number;
+};
+
 export default function NewLoanPage() {
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [pending, setPending] = useState<PendingLoanRequest | null>(null);
   const {
     register,
     control,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<NewLoanFormValues>({ resolver: zodResolver(newLoanSchema) });
 
   const values = watch();
+
+  // เลือกครัวเรือนแล้ว: ค้นหาแบบขอยืมเงินทุน (ฟอร์ม 2) ที่อนุมัติแล้วและยังไม่ได้ทำสัญญาของครัวเรือนนี้ ถ้ามีให้
+  // เติมจำนวนเงิน/อาชีพ/วันครบกำหนดชำระและผูกสัญญากับแบบขอยืมเงินทุนนั้นอัตโนมัติ พร้อมเสนอลำดับที่ยืมถัดไป
+  async function handleSelectHouseholdId(id: number | undefined) {
+    setValue("householdId", id as number);
+    setValue("loanRequestId", undefined);
+    setPending(null);
+    if (!id) return;
+    const res = await fetch(`/api/loan-requests/pending-for-loan?householdId=${id}`);
+    if (!res.ok) return;
+    const data: PendingLoanRequest = await res.json();
+    setPending(data);
+    setValue("borrowRound", data.suggestedBorrowRound);
+    if (data.loanRequestId) {
+      setValue("loanRequestId", data.loanRequestId);
+      if (data.suggestedAmount != null) setValue("amount", data.suggestedAmount);
+      if (data.suggestedOccupation) setValue("occupation", data.suggestedOccupation);
+      if (data.suggestedDueDate) setValue("dueDate", data.suggestedDueDate.slice(0, 10));
+    }
+  }
 
   async function onSubmit(data: NewLoanFormValues) {
     setSubmitError(null);
@@ -66,10 +96,15 @@ export default function NewLoanPage() {
               required
               error={errors.householdId?.message}
               value={field.value}
-              onChange={field.onChange}
+              onChange={handleSelectHouseholdId}
             />
           )}
         />
+        {pending?.loanRequestId && (
+          <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700">
+            พบแบบขอยืมเงินทุนที่อนุมัติแล้วของครัวเรือนนี้ — เติมจำนวนเงิน/อาชีพ/วันครบกำหนดชำระให้อัตโนมัติ และจะผูกสัญญานี้กับแบบขอยืมเงินทุนดังกล่าว
+          </p>
+        )}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <TextField
             label="ยืมครั้งที่"

@@ -450,6 +450,10 @@ model Loan {
   id                 Int      @id @default(autoincrement())
   householdId        Int
   household          TargetHousehold @relation(fields: [householdId], references: [id])
+  loanRequestId      Int? @unique // ผูกกับแบบขอยืมเงินทุน (ฟอร์ม 2) ที่อนุมัติแล้วซึ่งนำมาทำสัญญานี้ (ถ้ามี) —
+  // ใช้ตรวจสอบว่าครัวเรือนนี้ "ปิดรอบ" แบบเสนอโครงการ/แบบขอยืมเงินทุนแล้วหรือยัง (ดู lib/loanRoundGate.ts) เป็น
+  // null ได้สำหรับสัญญาเงินยืมเก่าที่บันทึกก่อนมีการเชื่อมโยงนี้ หรือครัวเรือนที่ไม่ได้ผ่านขั้นตอนดิจิทัลเต็มรูปแบบ
+  loanRequest        LoanRequest? @relation(fields: [loanRequestId], references: [id])
   borrowRound        Int // ยืมครั้งที่ (1, 2, 3, ...)
   contractNo         String? // เลขที่สัญญายืมเงิน
   amount             Float // จำนวนเงินยืม (บาท)
@@ -674,6 +678,8 @@ model LoanRequest {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  loan Loan? // สัญญาเงินยืม (เล่มเหลือง) ที่ทำจากแบบขอยืมเงินทุนนี้ (ถ้ามีแล้ว) — ดู Loan.loanRequestId
 
   @@unique([requestNo])
   @@unique([proposalId])

@@ -663,6 +663,7 @@ export const LOAN_REQUEST_STEP_FIELDS = [
 // ---------------------------------------------------------------------------
 export const newLoanSchema = z.object({
   householdId: z.number({ error: "กรุณาเลือกครัวเรือนเป้าหมาย" }).int().positive("กรุณาเลือกครัวเรือนเป้าหมาย"),
+  loanRequestId: z.number().int().positive().optional(),
   borrowRound: z
     .number({ error: "กรุณากรอกลำดับที่ยืม" })
     .int("ลำดับที่ยืมต้องเป็นจำนวนเต็ม")

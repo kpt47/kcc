@@ -31,9 +31,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: { formErrors: ["คุณไม่มีสิทธิ์บันทึกรายการยืมเงินให้ครัวเรือนนี้"] } }, { status: 403 });
   }
 
+  if (data.loanRequestId !== undefined) {
+    const loanRequest = await prisma.loanRequest.findUnique({
+      where: { id: data.loanRequestId },
+      select: { householdId: true, committeeDecision: true, loan: { select: { id: true } } },
+    });
+    if (
+      !loanRequest ||
+      loanRequest.householdId !== data.householdId ||
+      loanRequest.committeeDecision !== "approved" ||
+      loanRequest.loan
+    ) {
+      return NextResponse.json(
+        { error: { formErrors: ["แบบขอยืมเงินทุนที่อ้างอิงไม่ถูกต้อง หรือถูกใช้ทำสัญญาไปแล้ว"] } },
+        { status: 400 }
+      );
+    }
+  }
+
   const loan = await prisma.loan.create({
     data: {
       householdId: data.householdId,
+      loanRequestId: data.loanRequestId,
       borrowRound: data.borrowRound,
       contractNo: data.contractNo,
       amount: data.amount,

@@ -6,6 +6,7 @@ import { getAllowedVillageIds, canAccessHouseholdRecord } from "@/lib/scope";
 import { ACCESS_DENIED_MESSAGE } from "@/lib/authz";
 import { notifyVillageLeadership } from "@/lib/notifications/notifyUsers";
 import { createProposalWithAutoNumber } from "@/lib/documentNumbering";
+import { hasActiveLoanRound, ACTIVE_LOAN_ROUND_MESSAGE } from "@/lib/loanRoundGate";
 
 // แบบฟอร์ม 1 (แบบเสนอโครงการ): เฉพาะครัวเรือน (HOUSEHOLD) เป็นผู้สร้างของตนเองเท่านั้น — เจ้าหน้าที่/กรรมการ
 // ห้ามยื่นแทนครัวเรือน (ป้องกันการปลอมแปลงข้อมูลการยื่นคำร้อง)
@@ -33,6 +34,11 @@ export async function POST(request: Request) {
   const scope = await getAllowedVillageIds(user);
   if (!canAccessHouseholdRecord(user, scope, household)) {
     return NextResponse.json({ error: { formErrors: ["คุณไม่มีสิทธิ์เสนอโครงการให้ครัวเรือนนี้"] } }, { status: 403 });
+  }
+
+  // ครัวเรือนเป้าหมายมีได้ 1 รอบ (แบบเสนอโครงการ→แบบขอยืมเงินทุน→สัญญาเงินยืม) ที่ยังไม่จบพร้อมกันเท่านั้น
+  if (await hasActiveLoanRound(data.householdId)) {
+    return NextResponse.json({ error: { formErrors: [ACTIVE_LOAN_ROUND_MESSAGE] } }, { status: 409 });
   }
 
   // หมายเหตุ: ตั้งใจไม่รับ workerOpinion/committeeDecision ฯลฯ จาก payload นี้ แม้ proposalSchema
