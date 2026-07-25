@@ -1,4 +1,4 @@
-import { documentShell, fill, checkbox, COMPACT_FORM_STYLE } from "../layout";
+import { documentShell, fill, checkbox, OFFICIAL_FORM_STYLE } from "../layout";
 import { thaiBahtText } from "@/lib/thai";
 import { formatThaiDate } from "@/lib/formatDate";
 import { VILLAGE_ADDRESS_INCLUDE, villageAddress } from "@/lib/geo";
@@ -17,7 +17,7 @@ export type ProposalPdfOfficials = {
 };
 
 // จัดหน้าให้ตรงกับ "1 แบบเสนอโครงการ กข.คจ..pdf" (แบบแนบท้ายระเบียบกระทรวงมหาดไทยฯ พ.ศ. 2553 หมวด 4 ข้อ 16)
-// อัดให้พอดี A4 หน้าเดียว (ดู COMPACT_FORM_STYLE ใน lib/pdf/layout.ts) แทนที่จะล้นไปหน้า 2 เฉพาะย่อหน้าสุดท้าย
+// อัดให้พอดี A4 หน้าเดียว (ดู OFFICIAL_FORM_STYLE ใน lib/pdf/layout.ts) แทนที่จะล้นไปหน้า 2 เฉพาะย่อหน้าสุดท้าย
 export function renderProposalHtml(proposal: ProposalForPdf, officials: ProposalPdfOfficials): string {
   const h = proposal.household;
   const v = h.village;
@@ -109,5 +109,5 @@ export function renderProposalHtml(proposal: ProposalForPdf, officials: Proposal
       <p class="footnote"><u>หมายเหตุ</u> แบบแนบท้ายระเบียบกระทรวงมหาดไทยฯ พ.ศ.2553 หมวด 4 ข้อ 16</p>
     </div>`;
 
-  return documentShell(body, { extraStyle: COMPACT_FORM_STYLE });
+  return documentShell(body, { extraStyle: OFFICIAL_FORM_STYLE });
 }
